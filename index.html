@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Comprobante de gastos · Villalobos</title>
+  <link rel="icon" href="img/logo-verde.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="barra">
+    <div class="barra__marca">
+      <img src="img/logo-verde.png" alt="" width="36" height="35">
+      <div>
+        <div class="barra__titulo">Comprobante de gastos</div>
+        <div class="barra__sub">Agencia Aduanal Villalobos</div>
+      </div>
+    </div>
+    <div class="barra__acciones">
+      <button type="button" class="btn btn--ghost" id="btn-nueva">Nueva cuenta</button>
+      <button type="button" class="btn btn--oro" id="btn-excel">Descargar Excel</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Columna izquierda: documentos -->
+    <section class="col-docs">
+      <label class="drop" id="drop">
+        <input type="file" id="archivos" multiple accept=".xml,.pdf,application/pdf,text/xml,application/xml">
+        <strong>Arrastra aquí los XML y PDF de la cuenta</strong>
+        <span>o haz clic para elegirlos · factura de Villalobos, facturas de proveedores, pedimento, recibos</span>
+      </label>
+      <p class="nota-privacidad">Los archivos se leen en esta computadora; no se suben a ningún servidor.</p>
+
+      <ul class="docs" id="lista-docs"></ul>
+
+      <div class="visor" id="visor" hidden>
+        <div class="visor__barra">
+          <span id="visor-nombre"></span>
+          <span>
+            <a id="visor-abrir" target="_blank" rel="noopener">Abrir en pestaña</a>
+            <button type="button" class="btn-x" id="visor-cerrar" aria-label="Cerrar visor">×</button>
+          </span>
+        </div>
+        <div class="visor__paginas" id="visor-paginas"></div>
+        <pre id="visor-xml" hidden></pre>
+      </div>
+    </section>
+
+    <!-- Columna derecha: formato -->
+    <section class="col-form">
+      <div class="tarjeta">
+        <h2>Encabezado</h2>
+        <div class="grid g4">
+          <label>Comprobante de gastos No.<input data-bind="numero" inputmode="numeric"></label>
+          <label>Lugar<input data-bind="lugar"></label>
+          <label>Fecha<input data-bind="fecha" placeholder="21 de octubre 2026"></label>
+          <label>CFDI Villalobos No.<input data-bind="cfdiNo" inputmode="numeric"></label>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Cliente y operación</h2>
+        <div class="grid g3">
+          <label class="span2">Nombre o razón social<input data-bind="cliente.nombre"></label>
+          <label>R.F.C.<input data-bind="cliente.rfc" class="mayus"></label>
+          <label class="span2">Domicilio (línea 1)<input data-bind="cliente.dom1"></label>
+          <label>Guía No.<input data-bind="guia"></label>
+          <label class="span2">Domicilio (línea 2)<input data-bind="cliente.dom2"></label>
+          <label>COVE<input data-bind="cove" class="mayus"></label>
+          <label>Régimen<select data-bind="regimen" id="sel-regimen"></select></label>
+          <label class="span2">Mercancía / factura del proveedor<input data-bind="mercancia" placeholder="PATEK PHILIPPE F/0C90067178"></label>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Gastos pagados a nombre del cliente</h2>
+        <div class="grid g3 pedimento">
+          <label>Concepto<input value="IMPUESTOS Y DER SOBRE PEDIMENTO" disabled></label>
+          <label>Pedimento<input data-bind="pedimento" placeholder="2043-6200087"></label>
+          <label>Impuestos (total del cuadro de liquidación)<input data-bind="impuestos" data-num inputmode="decimal" class="num"></label>
+        </div>
+        <table class="tabla" id="tabla-gastos">
+          <thead><tr><th>Renglón</th><th>Referencia / origen</th><th class="num">Importe total</th><th class="num">IVA</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="fila-botones">
+          <button type="button" class="btn btn--chico" id="btn-derechos">+ Derechos</button>
+          <button type="button" class="btn btn--chico" id="btn-gasto">+ Otro gasto</button>
+        </div>
+        <fieldset class="modo-iva">
+          <legend>Desglose de IVA de los gastos</legend>
+          <label class="radio"><input type="radio" name="modoIva" value="actual"> Como en el formato actual (16% sobre todos los gastos) <b id="iva-actual"></b></label>
+          <label class="radio"><input type="radio" name="modoIva" value="real"> IVA real de las facturas <b id="iva-real"></b></label>
+        </fieldset>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Honorarios y complementarios</h2>
+        <table class="tabla" id="tabla-hon">
+          <thead><tr><th>Concepto</th><th>Referencia</th><th class="num">Importe</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Pie del comprobante</h2>
+        <div class="grid g4">
+          <label>Bultos<input data-bind="bultos" inputmode="numeric"></label>
+          <label>Peso (kg)<input data-bind="peso" inputmode="decimal"></label>
+          <label>País de origen<input data-bind="pais" class="mayus" placeholder="CHE"></label>
+          <label>Valor aduana<input data-bind="valorAduana" inputmode="decimal"></label>
+          <label>Anticipo<input data-bind="anticipo" data-num inputmode="decimal" class="num"></label>
+          <label>Oficinas en (1)<input data-bind="oficinas.0"></label>
+          <label>Oficinas en (2)<input data-bind="oficinas.1"></label>
+          <label>Oficinas en (3)<input data-bind="oficinas.2"></label>
+        </div>
+      </div>
+
+      <div class="tarjeta tarjeta--totales">
+        <h2>Totales</h2>
+        <dl class="totales" id="totales"></dl>
+        <p class="resumen" id="linea-resumen"></p>
+        <p class="resumen" id="linea-letra"></p>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Revisión</h2>
+        <ul class="checks" id="checks"></ul>
+      </div>
+
+      <details class="tarjeta catalogos">
+        <summary>Catálogos guardados en esta computadora</summary>
+        <p>La app recuerda el nombre y domicilio de cada cliente (por RFC) y en qué renglón va cada proveedor. Puedes cargar los clientes desde el Excel de cuentas que ya tienen.</p>
+        <label class="btn btn--chico">
+          Importar clientes del Excel de cuentas
+          <input type="file" id="importar-clientes" accept=".xlsx" hidden>
+        </label>
+        <p id="info-catalogos" class="muted"></p>
+      </details>
+    </section>
+  </main>
+
+  <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="js/logo.js"></script>
+  <script src="js/letras.js"></script>
+  <script src="js/cfdi.js"></script>
+  <script src="js/cuenta.js"></script>
+  <script src="js/excel.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
