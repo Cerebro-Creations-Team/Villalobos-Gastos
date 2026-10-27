@@ -4,6 +4,7 @@
   const CLAVE_BORRADOR = 'vg-borrador';
   const CLAVE_CLIENTES = 'vg-clientes';
   const CLAVE_PROVEEDORES = 'vg-proveedores';
+  const CLAVE_FORMATO = 'vg-formato';
 
   const $ = (sel, raiz = document) => raiz.querySelector(sel);
   const $$ = (sel, raiz = document) => Array.from(raiz.querySelectorAll(sel));
@@ -18,7 +19,12 @@
     try { localStorage.setItem(clave, JSON.stringify(valor)); } catch { /* sin almacenamiento */ }
   };
 
-  let cuenta = Object.assign(Cuenta.cuentaVacia(), leerLocal(CLAVE_BORRADOR, {}));
+  const formato = () => Object.assign({}, Cuenta.FORMATO_BASE, leerLocal(CLAVE_FORMATO, {}));
+  const recordarFormato = () => guardarLocal(CLAVE_FORMATO, {
+    etiquetaFlete: cuenta.etiquetaFlete, minOtros: cuenta.minOtros, oficinas: cuenta.oficinas,
+  });
+
+  let cuenta = Object.assign(Cuenta.cuentaVacia(formato()), leerLocal(CLAVE_BORRADOR, {}));
   let docs = [];
   let docSeleccionado = null;
   const camposAuto = new Set();
@@ -134,10 +140,20 @@
     if (!r) { doc.pdf.sinLectura = true; return; }
     doc.pdf.texto = r.texto;
     doc.pdf.escaneado = r.texto.replace(/\s/g, '').length < 40 * r.paginas;
+    // Si el PDF es la representación impresa de un XML ya cargado con otro nombre, se juntan por UUID
+    const textoMayus = r.texto.replace(/​/g, '').toUpperCase();
+    const gemelo = !doc.xml && docs.find((d) => d !== doc && d.xml && !d.pdf && d.xml.cfdi.uuid && textoMayus.includes(d.xml.cfdi.uuid));
+    if (gemelo) {
+      gemelo.pdf = doc.pdf;
+      docs = docs.filter((d) => d !== doc);
+      if (docSeleccionado === doc.id) docSeleccionado = gemelo.id;
+      doc = gemelo;
+    }
     if (doc.pdf.escaneado) return;
     const d = CFDI.datosDeTextoPDF(r.texto);
     doc.pdf.datos = d;
     ponerSiVacio('guia', d.guia);
+    ponerSiVacio('guiaHouse', d.guiaHouse);
     ponerSiVacio('bultos', d.bultos);
     ponerSiVacio('peso', d.peso);
     ponerSiVacio('valorAduana', d.valorAduana);
@@ -198,7 +214,7 @@
       referencia: !prov || prov.ref === 'folio' ? folioTexto(f) : prov.ref,
       importe: f.total, iva: f.iva,
       origen: `${f.emisor.nombre} ${folioTexto(f)}`,
-      rfcEmisor: f.emisor.rfc, folio: f.folio, serie: f.serie, rfcReceptor: f.receptor.rfc,
+      nombreEmisor: f.emisor.nombre, rfcEmisor: f.emisor.rfc, folio: f.folio, serie: f.serie, rfcReceptor: f.receptor.rfc,
     });
   }
 
@@ -207,7 +223,7 @@
     if (!g.rfcEmisor) return;
     const guardados = leerLocal(CLAVE_PROVEEDORES, {});
     const usaFolio = g.folio && g.referencia.includes(g.folio);
-    guardados[g.rfcEmisor] = { nombre: g.origen, concepto: g.concepto, ref: usaFolio ? 'folio' : g.referencia };
+    guardados[g.rfcEmisor] = { nombre: g.nombreEmisor || g.origen, concepto: g.concepto, ref: usaFolio ? 'folio' : g.referencia };
     guardarLocal(CLAVE_PROVEEDORES, guardados);
   }
 
@@ -367,8 +383,8 @@
       ['Saldo', t.saldo, 'fuerte'],
     ];
     $('#totales').innerHTML = filas.map(([k, v, c]) => `<dt class="${c || ''}">${k}</dt><dd class="${c || ''}">$${fmt(v)}</dd>`).join('');
-    $('#linea-resumen').textContent = Cuenta.lineaResumen(cuenta, t);
-    $('#linea-letra').textContent = Letras.importeConLetra(t.total);
+    $('#linea-resumen').placeholder = Cuenta.lineaResumen(cuenta, t);
+    $('#linea-letra').placeholder = Letras.importeConLetra(t.total);
     $('#iva-actual').textContent = `sin IVA $${fmt(t.sinIvaActual)} · IVA $${fmt(t.ivaActual)}`;
     $('#iva-real').textContent = `sin IVA $${fmt(t.gastos - t.ivaReal)} · IVA $${fmt(t.ivaReal)}`;
     pintarRevision(t);
@@ -505,7 +521,7 @@
       const ruta = el.dataset.bind;
       let v = el.value;
       if (el.classList.contains('mayus')) v = v.toUpperCase();
-      ponerRuta(cuenta, ruta, 'num' in el.dataset ? aNumero(v) : v);
+      ponerRuta(cuenta, ruta, 'num' in el.dataset ? aNumero(v) : 'entero' in el.dataset ? parseInt(v, 10) : v);
       camposAuto.delete(ruta);
       el.classList.remove('auto');
       cambio();
@@ -556,7 +572,7 @@
       if (!confirm('¿Empezar una cuenta nueva? Se borran los datos capturados y los documentos cargados.')) return;
       docs.forEach((d) => d.pdf && URL.revokeObjectURL(d.pdf.url));
       docs = [];
-      cuenta = Cuenta.cuentaVacia();
+      cuenta = Cuenta.cuentaVacia(formato());
       camposAuto.clear();
       cerrarVisor();
       pintarTodo();
@@ -571,6 +587,7 @@
         guardarLocal(CLAVE_CLIENTES, cat);
         pintarInfoCatalogos();
       }
+      recordarFormato();
       const nombre = await ExcelCuenta.descargar(cuenta);
       aviso(`Descargado: ${nombre}`);
     });

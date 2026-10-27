@@ -20,9 +20,19 @@
 
   // Proveedores conocidos: en qué renglón van y qué referencia llevan.
   // ref: 'folio' -> "Serie-Folio" de la factura; cualquier otro texto se usa tal cual.
+  // TME aparece igual de seguido en ALMACENAJES (con su folio) que en GASTOS DE MANIOBRAS ("TME04").
   const PROVEEDORES_BASE = {
     AAM401115988: { nombre: 'TME RECINTO FISCALIZADO', concepto: 'ALMACENAJES', ref: 'folio' },
     MCH070116DN9: { nombre: 'MEXICO CARGO HANDLING', concepto: 'GASTOS DE MANIOBRAS', ref: 'DESCONSOLIDACION' },
+    DIBN800222GL7: { nombre: 'NORMAN DIAZ BERRY', concepto: 'OTROS GASTOS', ref: 'CUSTODIA' },
+    SER170905QZ7: { nombre: 'SERMANTRAN', concepto: 'OTROS GASTOS', ref: 'MONTACARGAS' },
+  };
+
+  // Preferencias del acomodo que cambian de una cuenta a otra; la app recuerda las últimas usadas.
+  const FORMATO_BASE = {
+    etiquetaFlete: 'FLETE AEREO',
+    minOtros: 3,
+    oficinas: ['Veracruz, Veracruz', 'Toluca, Estado de México', 'Pantaco, Distrito Federal'],
   };
 
   const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
@@ -32,11 +42,11 @@
   const centavos = (v) => Math.round((Number(v) || 0) * 100);
   const pesos = (c) => c / 100;
 
-  function cuentaVacia() {
+  function cuentaVacia(formato = FORMATO_BASE) {
     return {
       numero: '', lugar: 'Ciudad de México', fecha: '',
       cliente: { nombre: '', rfc: '', dom1: '', dom2: '' },
-      guia: '', cove: '', regimen: 'IMPORTACION DEFINITIVA', mercancia: '',
+      guia: '', guiaHouse: '', cove: '', regimen: 'IMPORTACION DEFINITIVA', mercancia: '',
       pedimento: '', impuestos: 0,
       gastos: [],
       honorarios: Object.fromEntries(HONORARIOS.map((h) => [h.clave, { importe: 0, ref: '' }])),
@@ -44,7 +54,10 @@
       bultos: '', peso: '', pais: '', valorAduana: '',
       anticipo: 0,
       modoIva: 'actual',
-      oficinas: ['Veracruz, Veracruz', 'Toluca, Estado de México', 'Pantaco, Distrito Federal'],
+      lineaResumen: '', lineaLetra: '', // vacías = se generan solas
+      etiquetaFlete: formato.etiquetaFlete,
+      minOtros: formato.minOtros,
+      oficinas: [...formato.oficinas],
     };
   }
 
@@ -90,14 +103,14 @@
   }
 
   // Renglones de gastos en el orden del formato. Siempre aparecen flete, almacenajes y maniobras
-  // (en ceros si no hay), y al menos 3 renglones de OTROS GASTOS.
+  // (en ceros si no hay), y al menos c.minOtros renglones de OTROS GASTOS.
   function renglonesGastos(c) {
     const filas = [];
     const grupos = [
-      { nombres: ['FLETE AEREO', 'FLETE', 'FLETE TERRESTRE'], vacio: 'FLETE AEREO', minimo: 1 },
+      { nombres: ['FLETE AEREO', 'FLETE', 'FLETE TERRESTRE'], vacio: c.etiquetaFlete || 'FLETE AEREO', minimo: 1 },
       { nombres: ['ALMACENAJES'], vacio: 'ALMACENAJES', minimo: 1 },
       { nombres: ['GASTOS DE MANIOBRAS'], vacio: 'GASTOS DE MANIOBRAS', minimo: 1 },
-      { nombres: ['OTROS GASTOS'], vacio: 'OTROS GASTOS', minimo: 3 },
+      { nombres: ['OTROS GASTOS'], vacio: 'OTROS GASTOS', minimo: Number(c.minOtros) || 0 },
     ];
     for (const g of grupos) {
       const del = c.gastos.filter((x) => g.nombres.includes(x.concepto));
@@ -113,13 +126,13 @@
   function lineaResumen(c, t) {
     const bultos = String(parseInt(c.bultos, 10) || 0).padStart(2, '0');
     const peso = (parseFloat(String(c.peso).replace(/,/g, '')) || 0).toFixed(3);
-    const pais = (c.pais || '').toUpperCase();
+    const pais = (c.pais || '').trim().toUpperCase();
     const va = parseFloat(String(c.valorAduana).replace(/,/g, '')) || 0;
-    return `${bultos}B ${peso}KG *${pais}*  VM $${dinero(va)}  IMP $${dinero(c.impuestos)} GTOS $${dinero(t.gastos)}MN`;
+    return `${bultos}B ${peso}KG ${pais ? `*${pais}* ` : ''} VM $${dinero(va)}  IMP $${dinero(c.impuestos)} GTOS $${dinero(t.gastos)}MN`;
   }
 
   const api = {
-    CONCEPTOS_GASTO, HONORARIOS, REGIMENES, PROVEEDORES_BASE,
+    CONCEPTOS_GASTO, HONORARIOS, REGIMENES, PROVEEDORES_BASE, FORMATO_BASE,
     cuentaVacia, claveHonorario, fechaLarga, calcular, renglonesGastos, lineaResumen, normalizar, dinero,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

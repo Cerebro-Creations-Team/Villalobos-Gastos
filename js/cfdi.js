@@ -97,7 +97,9 @@
       bultos: primero(/Bultos:\s*(\d+)/i, /Piezas:\s*(\d+)/i),
       peso: primero(/Peso\s*\(Kgs\):\s*([\d.,]+)/i, /Peso:\s*([\d.,]+)/i),
       valorAduana: primero(/Valor\s+Aduana:\s*([\d.,]+)/i),
-      cove: primero(/\b(COVE[0-9A-Z]{9})\b/),
+      guiaHouse: primero(/Gu[ií]a\s+House:[ \t]*(\d[0-9A-Z/-]{3,})/),
+      // En el formato el COVE se escribe sin el prefijo: COVE268CCTKB3 -> 268CCTKB3
+      cove: primero(/\bCOVE([0-9A-Z]{9})\b/),
     };
   }
 

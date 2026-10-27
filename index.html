@@ -69,11 +69,12 @@
           <label class="span2">Nombre o razón social<input data-bind="cliente.nombre"></label>
           <label>R.F.C.<input data-bind="cliente.rfc" class="mayus"></label>
           <label class="span2">Domicilio (línea 1)<input data-bind="cliente.dom1"></label>
-          <label>Guía No.<input data-bind="guia"></label>
+          <label>Guía No. (master)<input data-bind="guia"></label>
           <label class="span2">Domicilio (línea 2)<input data-bind="cliente.dom2"></label>
-          <label>COVE<input data-bind="cove" class="mayus"></label>
+          <label>Guía house<input data-bind="guiaHouse" placeholder="40019462/00"></label>
           <label>Régimen<select data-bind="regimen" id="sel-regimen"></select></label>
-          <label class="span2">Mercancía / factura del proveedor<input data-bind="mercancia" placeholder="PATEK PHILIPPE F/0C90067178"></label>
+          <label>Mercancía / factura del proveedor<input data-bind="mercancia" placeholder="PATEK PHILIPPE F/0C90067178"></label>
+          <label>COVE<input data-bind="cove" class="mayus" placeholder="268CCTKB3"></label>
         </div>
       </div>
 
@@ -91,6 +92,10 @@
         <div class="fila-botones">
           <button type="button" class="btn btn--chico" id="btn-derechos">+ Derechos</button>
           <button type="button" class="btn btn--chico" id="btn-gasto">+ Otro gasto</button>
+        </div>
+        <div class="grid g3 acomodo">
+          <label>Renglón de flete cuando va vacío<select data-bind="etiquetaFlete"><option>FLETE AEREO</option><option>FLETE</option><option>FLETE TERRESTRE</option></select></label>
+          <label>Renglones de OTROS GASTOS (mínimo)<select data-bind="minOtros" data-entero><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
         </div>
         <fieldset class="modo-iva">
           <legend>Desglose de IVA de los gastos</legend>
@@ -124,8 +129,10 @@
       <div class="tarjeta tarjeta--totales">
         <h2>Totales</h2>
         <dl class="totales" id="totales"></dl>
-        <p class="resumen" id="linea-resumen"></p>
-        <p class="resumen" id="linea-letra"></p>
+        <div class="grid lineas-pie">
+          <label>Línea de resumen (se genera sola; puedes escribir otra)<input data-bind="lineaResumen" id="linea-resumen" class="mono"></label>
+          <label>Importe con letra (se genera solo; puedes escribir otro)<input data-bind="lineaLetra" id="linea-letra" class="mono"></label>
+        </div>
       </div>
 
       <div class="tarjeta">

@@ -111,7 +111,9 @@ input.auto { background: #f3f8f4; }
 .totales dt { color: var(--muted); }
 .totales dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .totales .fuerte { color: var(--verde); font-size: 16px; font-weight: 700; }
-.resumen { margin: 10px 0 0; font-family: Consolas, 'SF Mono', monospace; font-size: 12px; background: var(--marfil); padding: 6px 8px; border-radius: 4px; overflow-wrap: anywhere; }
+.lineas-pie { margin-top: 12px; }
+input.mono { font-family: Consolas, 'SF Mono', monospace; font-size: 12px; }
+.acomodo { margin-top: 12px; }
 
 .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .checks li { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }

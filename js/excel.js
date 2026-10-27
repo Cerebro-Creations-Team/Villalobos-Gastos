@@ -77,6 +77,7 @@
     poner(`J${r + 3}`, 'Guía No. :', { tam: 7, b: false });
     poner(`K${r + 3}`, c.guia, { tam: 9, al: 'left' });
     poner(`C${r + 4}`, c.cliente.dom1, { tam: 9 });
+    if (c.guiaHouse) poner(`K${r + 4}`, c.guiaHouse, { tam: 9, al: 'left' });
     poner(`C${r + 5}`, c.cliente.dom2, { tam: 9 });
     poner(`J${r + 5}`, 'COVE:', { tam: 7, b: false });
     poner(`K${r + 5}`, c.cove, { tam: 9, al: 'left' });
@@ -87,7 +88,7 @@
     if (c.mercancia) poner(`C${r + 1}`, c.mercancia, { tam: 9, al: 'left' });
     r += 3;
     const primeraGasto = r;
-    poner(`C${r}`, 'IMPUESTOS Y DER SOBRE ', { tam: 9 });
+    poner(`C${r}`, 'IMPUESTOS Y DER SOBRE PEDIMENTO', { tam: 9 });
     poner(`F${r}`, c.pedimento, { tam: 9 });
     dinero(`K${r}`, Number(c.impuestos) || 0);
     for (const fila of Cuenta.renglonesGastos(c)) {
@@ -132,8 +133,8 @@
 
     // ---------- Pie: resumen, importe con letra y totales ----------
     r += 2;
-    poner(`B${r}`, Cuenta.lineaResumen(c, t), { tam: 9 });
-    poner(`B${r + 1}`, Letras.importeConLetra(t.total), { tam: 9 });
+    poner(`B${r}`, c.lineaResumen || Cuenta.lineaResumen(c, t), { tam: 9 });
+    poner(`B${r + 1}`, c.lineaLetra || Letras.importeConLetra(t.total), { tam: 9 });
     alto(r + 1, 13.5);
     r += 2;
     const iniTot = r;
