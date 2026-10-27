@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/app.css?v=20261026c">
 </head>
 <body>
   <header class="barra">
@@ -21,6 +21,7 @@
       </div>
     </div>
     <div class="barra__acciones">
+      <button type="button" class="btn btn--ghost" id="btn-historial">Cuentas anteriores</button>
       <button type="button" class="btn btn--ghost" id="btn-nueva">Nueva cuenta</button>
       <button type="button" class="btn btn--oro" id="btn-pdf">Descargar PDF</button>
       <button type="button" class="btn btn--oro" id="btn-excel">Descargar Excel</button>
@@ -153,17 +154,37 @@
     </section>
   </main>
 
+  <dialog class="historial" id="historial" aria-labelledby="historial-titulo">
+    <div class="historial__barra">
+      <h2 id="historial-titulo">Cuentas anteriores</h2>
+      <button type="button" class="btn-x" id="historial-cerrar" aria-label="Cerrar">×</button>
+    </div>
+    <p class="muted">Cada cuenta que se descarga en Excel o PDF queda guardada en esta computadora. Desde aquí puedes volver a bajarla o abrirla para corregirla.</p>
+    <input type="search" id="historial-buscar" placeholder="Buscar por número, cliente, RFC o pedimento">
+    <div class="historial__lista">
+      <table class="tabla" id="tabla-historial">
+        <thead><tr><th>No.</th><th>Cliente</th><th>Pedimento</th><th>Fecha</th><th class="num">Total</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="fila-botones historial__pie">
+      <button type="button" class="btn btn--chico" id="historial-exportar">Exportar respaldo</button>
+      <label class="btn btn--chico">Importar respaldo<input type="file" id="historial-importar" accept=".json,application/json" hidden></label>
+      <span class="muted" id="historial-info"></span>
+    </div>
+  </dialog>
+
   <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="js/logo.js"></script>
-  <script src="js/letras.js"></script>
-  <script src="js/cfdi.js"></script>
-  <script src="js/cuenta.js"></script>
-  <script src="js/excel.js"></script>
-  <script src="js/pdf-cuenta.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/logo.js?v=20261026c"></script>
+  <script src="js/letras.js?v=20261026c"></script>
+  <script src="js/cfdi.js?v=20261026c"></script>
+  <script src="js/cuenta.js?v=20261026c"></script>
+  <script src="js/excel.js?v=20261026c"></script>
+  <script src="js/pdf-cuenta.js?v=20261026c"></script>
+  <script src="js/app.js?v=20261026c"></script>
 </body>
 </html>

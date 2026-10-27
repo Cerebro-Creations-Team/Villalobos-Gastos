@@ -186,7 +186,7 @@
   }
 
   function nombreArchivo(c, extension) {
-    const nombreCliente = (c.cliente.nombre || 'cliente').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+    const nombreCliente = (c.cliente.nombre || 'cliente').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim().replace(/\.+$/, '');
     return `Cuenta ${c.numero || 'sin numero'} ${nombreCliente}.${extension}`;
   }
 
@@ -203,7 +203,7 @@
   async function descargar(c) {
     const buffer = await construirLibro(c).xlsx.writeBuffer();
     const nombre = nombreArchivo(c, 'xlsx');
-    bajarBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nombre);
+    global.ExcelCuenta.bajarBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nombre);
     return nombre;
   }
 

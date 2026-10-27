@@ -27,7 +27,10 @@ button, input, select { font: inherit; color: inherit; }
 .barra__marca img { background: var(--marfil); border-radius: 50%; padding: 3px; }
 .barra__titulo { font-family: var(--titulos); font-size: 20px; }
 .barra__sub { font-size: 12px; color: var(--oro); letter-spacing: .04em; }
-.barra__acciones { display: flex; gap: 8px; }
+.barra { flex-wrap: wrap; }
+.barra__titulo { white-space: nowrap; }
+.barra__acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.barra__acciones .btn { white-space: nowrap; }
 
 .btn { border: 1px solid var(--linea); background: var(--blanco); border-radius: var(--radio); padding: 8px 14px; cursor: pointer; font-weight: 600; }
 .btn:hover { border-color: var(--verde); }
@@ -127,6 +130,18 @@ input.mono { font-family: Consolas, 'SF Mono', monospace; font-size: 12px; }
 .catalogos label.btn { display: inline-flex; color: var(--grafito); font-size: 13px; }
 .muted { color: var(--muted); }
 
+.historial { width: min(980px, calc(100% - 32px)); max-height: calc(100vh - 64px); border: 0; border-radius: 10px; padding: 18px 20px; display: none; flex-direction: column; gap: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.historial[open] { display: flex; }
+.historial::backdrop { background: rgba(13, 43, 34, .45); }
+.historial__barra { display: flex; justify-content: space-between; align-items: center; }
+.historial__barra h2 { margin: 0; font-family: var(--titulos); color: var(--verde); font-size: 20px; }
+.historial p { margin: 0; font-size: 13px; }
+.historial__lista { overflow: auto; min-height: 120px; border: 1px solid var(--linea); border-radius: var(--radio); }
+.historial .tabla td { font-size: 13px; padding: 6px; border-bottom: 1px solid var(--linea); }
+.historial .tabla thead th { position: sticky; top: 0; background: var(--blanco); }
+.historial .acciones { white-space: nowrap; text-align: right; }
+.historial__pie { align-items: center; margin-top: 0; }
+.historial__pie label.btn { flex-direction: row; display: inline-flex; color: var(--grafito); font-size: 13px; }
 .aviso { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--verde); color: var(--blanco); padding: 10px 16px; border-radius: var(--radio); font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100% - 32px); }
 .aviso.ver { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -142,8 +157,9 @@ input.mono { font-family: Consolas, 'SF Mono', monospace; font-size: 12px; }
   .barra__sub { display: none; }
   .barra__marca img { width: 28px; height: 27px; }
   .barra__titulo { font-size: 15px; }
-  .barra { flex-wrap: wrap; }
-  .barra__acciones .btn { padding: 6px 9px; font-size: 12px; white-space: nowrap; }
+  .barra__acciones .btn { padding: 6px 9px; font-size: 12px; }
+  .historial .tabla thead { display: table-header-group; }
+  .historial .tabla tr { display: table-row; }
   .g3, .g4 { grid-template-columns: 1fr 1fr; }
   .span2 { grid-column: span 2; }
   .tabla thead { display: none; }

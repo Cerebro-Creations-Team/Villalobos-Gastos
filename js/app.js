@@ -5,6 +5,7 @@
   const CLAVE_CLIENTES = 'vg-clientes';
   const CLAVE_PROVEEDORES = 'vg-proveedores';
   const CLAVE_FORMATO = 'vg-formato';
+  const CLAVE_HISTORIAL = 'vg-historial';
 
   const $ = (sel, raiz = document) => raiz.querySelector(sel);
   const $$ = (sel, raiz = document) => Array.from(raiz.querySelectorAll(sel));
@@ -60,6 +61,9 @@
   let temporizadorAviso;
   function aviso(msg) {
     const el = $('#aviso');
+    // Con la ventana del historial abierta, el aviso tiene que ir dentro de ella para verse encima
+    const dlg = $('#historial');
+    (dlg.open ? dlg : document.body).appendChild(el);
     el.textContent = msg;
     el.classList.add('ver');
     clearTimeout(temporizadorAviso);
@@ -454,6 +458,114 @@
     guardarLocal(CLAVE_BORRADOR, cuenta);
   }
 
+  // ---------- Historial de cuentas descargadas ----------
+  // Se guardan los datos de la cuenta (no los archivos); el Excel y el PDF se vuelven a generar al pedirlos.
+  const historial = () => leerLocal(CLAVE_HISTORIAL, []);
+  const idCuenta = (c) => `${(c.cliente.rfc || 'SINRFC').toUpperCase()}-${String(c.numero || '').trim() || 'SN'}`;
+
+  function guardarEnHistorial() {
+    const lista = historial();
+    const id = idCuenta(cuenta);
+    const copia = JSON.parse(JSON.stringify(cuenta));
+    const registro = { id, guardado: new Date().toISOString(), cuenta: copia };
+    const i = lista.findIndex((h) => h.id === id);
+    if (i >= 0) lista.splice(i, 1);
+    lista.unshift(registro);
+    try {
+      localStorage.setItem(CLAVE_HISTORIAL, JSON.stringify(lista));
+    } catch {
+      aviso('No se pudo guardar en el historial (almacenamiento lleno o bloqueado). Exporta un respaldo.');
+    }
+  }
+
+  const fechaCorta = (iso) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  function pintarHistorial() {
+    const lista = historial();
+    const q = Cuenta.normalizar($('#historial-buscar').value);
+    const visibles = lista.filter((h) => {
+      if (!q) return true;
+      const c = h.cuenta;
+      return Cuenta.normalizar([c.numero, c.cliente.nombre, c.cliente.rfc, c.pedimento, c.fecha].join(' ')).includes(q);
+    });
+    $('#tabla-historial tbody').innerHTML = visibles.length
+      ? visibles.map((h) => {
+        const c = h.cuenta;
+        return `<tr data-id="${esc(h.id)}">
+          <td class="etiqueta">${esc(c.numero)}</td>
+          <td>${esc(c.cliente.nombre)}<span class="origen">${esc(c.cliente.rfc)}</span></td>
+          <td>${esc(c.pedimento)}</td>
+          <td>${esc(c.fecha)}<span class="origen">Guardada ${fechaCorta(h.guardado)}</span></td>
+          <td class="num">$${fmt(Cuenta.calcular(c).total)}</td>
+          <td class="acciones">
+            <button type="button" class="btn btn--chico" data-accion="pdf">PDF</button>
+            <button type="button" class="btn btn--chico" data-accion="excel">Excel</button>
+            <button type="button" class="btn btn--chico" data-accion="abrir">Abrir</button>
+            <button type="button" class="btn-x" data-accion="borrar" aria-label="Borrar del historial">×</button>
+          </td>
+        </tr>`;
+      }).join('')
+      : `<tr class="vacio"><td colspan="6">${lista.length ? 'Ninguna cuenta coincide con la búsqueda.' : 'Todavía no hay cuentas guardadas. Se agregan solas al descargar una cuenta en Excel o PDF.'}</td></tr>`;
+    $('#historial-info').textContent = `${lista.length} cuenta(s) guardadas`;
+  }
+
+  async function accionHistorial(id, accion) {
+    const lista = historial();
+    const h = lista.find((x) => x.id === id);
+    if (!h) return;
+    // Las cuentas guardadas con versiones anteriores reciben los campos nuevos con su valor por omisión
+    const c = Object.assign(Cuenta.cuentaVacia(formato()), JSON.parse(JSON.stringify(h.cuenta)));
+    if (accion === 'pdf') aviso(`Descargado: ${PdfCuenta.descargarPDF(c)}`);
+    else if (accion === 'excel') aviso(`Descargado: ${await ExcelCuenta.descargar(c)}`);
+    else if (accion === 'abrir') {
+      if (!confirm(`¿Abrir la cuenta ${c.numero}? Se reemplaza lo que tienes capturado ahora.`)) return;
+      docs.forEach((d) => d.pdf && URL.revokeObjectURL(d.pdf.url));
+      docs = [];
+      cuenta = c;
+      camposAuto.clear();
+      cerrarVisor();
+      pintarTodo();
+      $('#historial').close();
+      aviso(`Cuenta ${c.numero} abierta. Los documentos originales no se guardan; vuelve a subirlos si los necesitas.`);
+    } else if (accion === 'borrar') {
+      if (!confirm(`¿Borrar la cuenta ${c.numero} del historial de esta computadora?`)) return;
+      guardarLocal(CLAVE_HISTORIAL, lista.filter((x) => x.id !== id));
+      pintarHistorial();
+    }
+  }
+
+  function exportarRespaldo() {
+    const datos = { app: 'villalobos-gastos', version: 1, exportado: new Date().toISOString(), cuentas: historial() };
+    const hoy = new Date().toISOString().slice(0, 10);
+    ExcelCuenta.bajarBlob(new Blob([JSON.stringify(datos, null, 1)], { type: 'application/json' }), `Respaldo cuentas de gastos ${hoy}.json`);
+  }
+
+  async function importarRespaldo(archivo) {
+    let datos;
+    try { datos = JSON.parse(await archivo.text()); } catch { aviso('El archivo no es un respaldo válido.'); return; }
+    const entrantes = Array.isArray(datos?.cuentas) ? datos.cuentas.filter((h) => h && h.id && h.cuenta && h.cuenta.cliente) : null;
+    if (datos?.app !== 'villalobos-gastos' || !entrantes) { aviso('El archivo no es un respaldo de esta app.'); return; }
+    // Se juntan con lo que ya hay; si la misma cuenta está en los dos, se queda la guardada más reciente
+    const porId = new Map(historial().map((h) => [h.id, h]));
+    let nuevas = 0;
+    for (const h of entrantes) {
+      const actual = porId.get(h.id);
+      if (!actual) nuevas++;
+      if (!actual || String(h.guardado) > String(actual.guardado)) porId.set(h.id, h);
+    }
+    const lista = [...porId.values()].sort((a, b) => String(b.guardado).localeCompare(String(a.guardado)));
+    try {
+      localStorage.setItem(CLAVE_HISTORIAL, JSON.stringify(lista));
+      aviso(`Respaldo importado: ${nuevas} cuenta(s) nuevas, ${entrantes.length} en el archivo.`);
+    } catch {
+      aviso('No se pudo guardar el respaldo en esta computadora.');
+    }
+    pintarHistorial();
+  }
+
   // ---------- Catálogo de clientes desde el Excel de cuentas ----------
   function textoCelda(v) {
     if (v == null) return '';
@@ -588,6 +700,7 @@
         pintarInfoCatalogos();
       }
       recordarFormato();
+      guardarEnHistorial();
     };
     $('#btn-excel').addEventListener('click', async () => {
       if (!window.ExcelJS) { aviso('No se pudo cargar la librería de Excel. Revisa la conexión a internet.'); return; }
@@ -600,6 +713,26 @@
       recordarAlDescargar();
       const nombre = PdfCuenta.descargarPDF(cuenta);
       aviso(`Descargado: ${nombre}`);
+    });
+
+    const dlg = $('#historial');
+    $('#btn-historial').addEventListener('click', () => {
+      $('#historial-buscar').value = '';
+      pintarHistorial();
+      dlg.showModal();
+    });
+    $('#historial-cerrar').addEventListener('click', () => dlg.close());
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // clic fuera de la ventana
+    $('#historial-buscar').addEventListener('input', pintarHistorial);
+    $('#tabla-historial tbody').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-accion]');
+      if (b) accionHistorial(b.closest('tr').dataset.id, b.dataset.accion).catch((err) => aviso(`No se pudo: ${err.message}`));
+    });
+    $('#historial-exportar').addEventListener('click', exportarRespaldo);
+    $('#historial-importar').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      e.target.value = '';
+      if (f) importarRespaldo(f);
     });
 
     $('#importar-clientes').addEventListener('change', (e) => {
