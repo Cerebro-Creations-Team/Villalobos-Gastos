@@ -1,55 +1,33 @@
-// Genera el comprobante de gastos en Excel con el mismo acomodo que el bloque de "CUENTAS AGENCIA ADUANAL V.xlsx"
-// (columnas B a K, mismos anchos, fuentes y bordes medianos).
+// Diseño del comprobante de gastos con el mismo acomodo que el bloque de "CUENTAS AGENCIA ADUANAL V.xlsx"
+// (columnas B a K, mismos anchos, fuentes y bordes medianos). El diseño se arma una sola vez y de él
+// salen el Excel (aquí) y el PDF (pdf.js), para que los dos queden idénticos.
 (function (global) {
   const FMT_PESOS = '_-"$"* #,##0.00_-;\\-"$"* #,##0.00_-;_-"$"* "-"??_-;_-@_-';
   const ANCHOS = { A: 5.14, B: 3.29, C: 13.29, D: 21.14, E: 14.57, F: 11.29, G: 17.43, H: 5.86, I: 14.71, J: 10.86, K: 19, L: 3.43 };
-  const BORDE = { style: 'medium' };
+  const ALTO_FILA = 12.75;
+  const LOGO = { col: 2, fila: 0.3, ancho: 92, alto: 89 }; // posición en celdas (base 0) y tamaño en px
 
-  function construirLibro(c) {
+  const columna = (letra) => letra.charCodeAt(0) - 64; // A -> 1
+
+  // Devuelve { celdas, alturas, recuadros, ultimaFila }. Cada celda: { fila, col, valor, estilo }.
+  function diseno(c) {
     const t = Cuenta.calcular(c);
-    const wb = new ExcelJS.Workbook();
-    wb.creator = 'Agencia Aduanal Villalobos';
-    const ws = wb.addWorksheet(`CUENTA ${c.numero || ''}`.trim(), {
-      views: [{ showGridLines: false }],
-      pageSetup: {
-        paperSize: 1, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
-        margins: { left: 0.43, right: 0.3, top: 0.47, bottom: 0.4, header: 0.3, footer: 0.3 },
-      },
-    });
-    for (const [col, w] of Object.entries(ANCHOS)) ws.getColumn(col).width = w;
+    const celdas = [];
+    const alturas = {};
+    const recuadros = [];
 
     const poner = (ref, valor, estilo = {}) => {
-      const cel = ws.getCell(ref);
-      cel.value = valor;
-      cel.font = { name: estilo.fuente || 'Arial', size: estilo.tam || 9, bold: estilo.b ?? true };
-      if (estilo.fmt) cel.numFmt = estilo.fmt;
-      if (estilo.al) cel.alignment = { horizontal: estilo.al, vertical: 'middle' };
-      return cel;
+      const [, letra, fila] = ref.match(/^([A-Z])(\d+)$/);
+      celdas.push({ fila: Number(fila), col: columna(letra), valor, estilo: { fuente: 'Arial', tam: 9, b: true, ...estilo } });
     };
     const dinero = (ref, valor, tam = 9) => poner(ref, valor, { fmt: FMT_PESOS, tam });
-    const alto = (fila, h) => { ws.getRow(fila).height = h; };
-    // Recuadro con borde mediano de (fila1, col1) a (fila2, col2)
-    const recuadro = (f1, c1, f2, c2) => {
-      for (let f = f1; f <= f2; f++) {
-        for (let col = c1; col <= c2; col++) {
-          const b = {};
-          if (f === f1) b.top = BORDE;
-          if (f === f2) b.bottom = BORDE;
-          if (col === c1) b.left = BORDE;
-          if (col === c2) b.right = BORDE;
-          if (Object.keys(b).length) ws.getCell(f, col).border = b;
-        }
-      }
-    };
+    const alto = (fila, h) => { alturas[fila] = h; };
+    const recuadro = (f1, c1, f2, c2) => recuadros.push({ f1, c1, f2, c2 });
 
     // ---------- Encabezado de la agencia ----------
     let r = 2;
     alto(r - 1, 32.25);
     alto(r, 33);
-    if (global.LOGO_PNG_BASE64) {
-      const img = wb.addImage({ base64: global.LOGO_PNG_BASE64, extension: 'png' });
-      ws.addImage(img, { tl: { col: 2, row: 0.3 }, ext: { width: 92, height: 89 } });
-    }
     poner(`E${r}`, 'AGENCIA ADUANAL VILLALOBOS S.C.', { tam: 18 });
     poner(`F${r + 1}`, ' A.A. Constantino Villalobos Sánchez', { tam: 10 });
     poner(`G${r + 2}`, 'Patente 2043', { tam: 10 });
@@ -155,7 +133,49 @@
     recuadro(iniTot, 8, fSaldo + 1, 11);
     alto(fSaldo + 1, 13.5);
 
-    ws.pageSetup.printArea = `A1:L${fSaldo + 2}`;
+    return { celdas, alturas, recuadros, ultimaFila: fSaldo + 2 };
+  }
+
+  function construirLibro(c) {
+    const d = diseno(c);
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Agencia Aduanal Villalobos';
+    const ws = wb.addWorksheet(`CUENTA ${c.numero || ''}`.trim(), {
+      views: [{ showGridLines: false }],
+      pageSetup: {
+        paperSize: 1, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+        margins: { left: 0.43, right: 0.3, top: 0.47, bottom: 0.4, header: 0.3, footer: 0.3 },
+      },
+    });
+    for (const [col, w] of Object.entries(ANCHOS)) ws.getColumn(col).width = w;
+    for (const [fila, h] of Object.entries(d.alturas)) ws.getRow(Number(fila)).height = h;
+
+    if (global.LOGO_PNG_BASE64) {
+      const img = wb.addImage({ base64: global.LOGO_PNG_BASE64, extension: 'png' });
+      ws.addImage(img, { tl: { col: LOGO.col, row: LOGO.fila }, ext: { width: LOGO.ancho, height: LOGO.alto } });
+    }
+    for (const { fila, col, valor, estilo } of d.celdas) {
+      const cel = ws.getCell(fila, col);
+      cel.value = valor;
+      cel.font = { name: estilo.fuente, size: estilo.tam, bold: estilo.b };
+      if (estilo.fmt) cel.numFmt = estilo.fmt;
+      if (estilo.al) cel.alignment = { horizontal: estilo.al, vertical: 'middle' };
+    }
+    // Recuadros con borde mediano
+    const borde = { style: 'medium' };
+    for (const { f1, c1, f2, c2 } of d.recuadros) {
+      for (let f = f1; f <= f2; f++) {
+        for (let col = c1; col <= c2; col++) {
+          const b = {};
+          if (f === f1) b.top = borde;
+          if (f === f2) b.bottom = borde;
+          if (col === c1) b.left = borde;
+          if (col === c2) b.right = borde;
+          if (Object.keys(b).length) ws.getCell(f, col).border = { ...ws.getCell(f, col).border, ...b };
+        }
+      }
+    }
+    ws.pageSetup.printArea = `A1:L${d.ultimaFila}`;
     return wb;
   }
 
@@ -165,12 +185,12 @@
     return /^\d+$/.test(s) ? Number(s) : s;
   }
 
-  async function descargar(c) {
-    const wb = construirLibro(c);
-    const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  function nombreArchivo(c, extension) {
     const nombreCliente = (c.cliente.nombre || 'cliente').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
-    const nombre = `Cuenta ${c.numero || 'sin numero'} ${nombreCliente}.xlsx`;
+    return `Cuenta ${c.numero || 'sin numero'} ${nombreCliente}.${extension}`;
+  }
+
+  function bajarBlob(blob, nombre) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = nombre;
@@ -178,8 +198,14 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  async function descargar(c) {
+    const buffer = await construirLibro(c).xlsx.writeBuffer();
+    const nombre = nombreArchivo(c, 'xlsx');
+    bajarBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nombre);
     return nombre;
   }
 
-  global.ExcelCuenta = { construirLibro, descargar };
+  global.ExcelCuenta = { construirLibro, descargar, diseno, nombreArchivo, bajarBlob, ANCHOS, ALTO_FILA, LOGO, FMT_PESOS };
 })(this);

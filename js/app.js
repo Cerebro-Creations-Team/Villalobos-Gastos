@@ -578,8 +578,8 @@
       pintarTodo();
     });
 
-    $('#btn-excel').addEventListener('click', async () => {
-      if (!window.ExcelJS) { aviso('No se pudo cargar la librería de Excel. Revisa la conexión a internet.'); return; }
+    // Al descargar se recuerdan el cliente y el acomodo usado
+    const recordarAlDescargar = () => {
       if (cuenta.cliente.rfc) {
         const cat = clientes();
         const { nombre, dom1, dom2 } = cuenta.cliente;
@@ -588,7 +588,17 @@
         pintarInfoCatalogos();
       }
       recordarFormato();
+    };
+    $('#btn-excel').addEventListener('click', async () => {
+      if (!window.ExcelJS) { aviso('No se pudo cargar la librería de Excel. Revisa la conexión a internet.'); return; }
+      recordarAlDescargar();
       const nombre = await ExcelCuenta.descargar(cuenta);
+      aviso(`Descargado: ${nombre}`);
+    });
+    $('#btn-pdf').addEventListener('click', () => {
+      if (!window.jspdf) { aviso('No se pudo cargar la librería de PDF. Revisa la conexión a internet.'); return; }
+      recordarAlDescargar();
+      const nombre = PdfCuenta.descargarPDF(cuenta);
       aviso(`Descargado: ${nombre}`);
     });
 

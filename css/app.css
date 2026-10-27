@@ -142,6 +142,7 @@ input.mono { font-family: Consolas, 'SF Mono', monospace; font-size: 12px; }
   .barra__sub { display: none; }
   .barra__marca img { width: 28px; height: 27px; }
   .barra__titulo { font-size: 15px; }
+  .barra { flex-wrap: wrap; }
   .barra__acciones .btn { padding: 6px 9px; font-size: 12px; white-space: nowrap; }
   .g3, .g4 { grid-template-columns: 1fr 1fr; }
   .span2 { grid-column: span 2; }
