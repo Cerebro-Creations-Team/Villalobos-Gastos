@@ -157,7 +157,15 @@ input.mono { font-family: Consolas, 'SF Mono', monospace; font-size: 12px; }
 .panel-exp { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; }
 .panel-exp__barra { display: flex; gap: 8px; }
 .panel-exp__barra input { flex: 1; }
-.arbol { display: flex; flex-direction: column; gap: 6px; }
+.arbol { display: flex; flex-direction: column; gap: 10px; }
+.arbol__grupo { display: flex; flex-direction: column; gap: 6px; }
+.arbol__titulo { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.arbol__grupo--terminados { background: none; border: 0; }
+.arbol__grupo--terminados > summary.arbol__titulo { cursor: pointer; padding: 2px 0; }
+.arbol__grupo--terminados > summary.arbol__titulo .chip--alerta { margin: 0; }
+.arbol__grupo--terminados > div.arbol__mes:first-of-type { margin-top: 6px; }
+.arbol__mes { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.arbol__submes { margin: 0 0 2px; font-size: 11px; font-weight: 700; color: var(--grafito); }
 .arbol__cliente { background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio); }
 .arbol__cliente summary { padding: 8px 10px; cursor: pointer; font-size: 13px; }
 .arbol__cliente ul { list-style: none; margin: 0; padding: 0 6px 6px; }

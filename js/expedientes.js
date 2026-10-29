@@ -204,23 +204,75 @@
     const soloPendientes = $('#exp-solo-pendientes').checked;
     const visibles = expedientes.filter((e) => (!soloPendientes || pendiente(e))
       && (!q || Cuenta.normalizar(`${e.cliente} ${e.rfc} ${e.pedimento} ${e.referencia}`).includes(q)));
-    const porCliente = new Map();
-    for (const e of visibles) {
-      if (!porCliente.has(e.rfc)) porCliente.set(e.rfc, { cliente: e.cliente, lista: [] });
-      porCliente.get(e.rfc).lista.push(e);
+
+    if (!visibles.length) {
+      $('#arbol-expedientes').innerHTML = `<p class="muted">${expedientes.length ? (soloPendientes ? 'No hay expedientes pendientes.' : 'Ningún expediente coincide.') : 'Todavía no hay expedientes. Crea el primero con «+ Nuevo expediente».'}</p>`;
+      return;
     }
-    $('#arbol-expedientes').innerHTML = porCliente.size
-      ? [...porCliente.entries()].map(([rfc, g]) => `
-        <details class="arbol__cliente" ${q || soloPendientes || porCliente.size === 1 || g.lista.some((e) => e.id === abierto?.id || pendiente(e)) ? 'open' : ''}>
-          <summary><strong>${esc(g.cliente)}</strong> <span class="muted">${esc(rfc)} · ${g.lista.length}</span>${g.lista.some(pendiente) ? ` <span class="chip chip--alerta">${g.lista.filter(pendiente).length} pendiente(s)</span>` : ''}</summary>
-          <ul>${g.lista.map((e) => `
-            <li class="arbol__ped${e.id === abierto?.id ? ' sel' : ''}" data-id="${e.id}">
-              <span>${esc(e.pedimento)}${e.referencia ? ` <span class="chip">${esc(e.referencia)}</span>` : ''}</span>
-              <span class="muted">${e.archivos_expediente || 0} doc. ${pendiente(e) ? '<span class="chip chip--alerta">Falta cuenta</span>' : `<span class="chip">Cuenta ${esc(e.cuenta)}</span>`}</span>
-            </li>`).join('')}
-          </ul>
-        </details>`).join('')
-      : `<p class="muted">${expedientes.length ? (soloPendientes ? 'No hay expedientes pendientes.' : 'Ningún expediente coincide.') : 'Todavía no hay expedientes. Crea el primero con «+ Nuevo expediente».'}</p>`;
+
+    const porCliente = (lista) => {
+      const m = new Map();
+      for (const e of lista) {
+        if (!m.has(e.rfc)) m.set(e.rfc, { cliente: e.cliente, lista: [] });
+        m.get(e.rfc).lista.push(e);
+      }
+      return m;
+    };
+
+    const pedimentoLi = (e) => `
+      <li class="arbol__ped${e.id === abierto?.id ? ' sel' : ''}" data-id="${e.id}">
+        <span>${esc(e.pedimento)}${e.referencia ? ` <span class="chip">${esc(e.referencia)}</span>` : ''}</span>
+        <span class="muted">${e.archivos_expediente || 0} doc. ${pendiente(e) ? '<span class="chip chip--alerta">Falta cuenta</span>' : `<span class="chip">Cuenta ${esc(e.cuenta)}</span>`}</span>
+      </li>`;
+
+    // forzar: siempre abierto (grupo de pendientes); soloUno: único cliente visible en su grupo
+    const clienteHtml = (rfc, g, { forzar = false, soloUno = false } = {}) => `
+      <details class="arbol__cliente" ${forzar || q || soloUno || g.lista.some((e) => e.id === abierto?.id) ? 'open' : ''}>
+        <summary><strong>${esc(g.cliente)}</strong> <span class="muted">${esc(rfc)} · ${g.lista.length}</span>${g.lista.some(pendiente) ? ` <span class="chip chip--alerta">${g.lista.filter(pendiente).length} pendiente(s)</span>` : ''}</summary>
+        <ul>${g.lista.map(pedimentoLi).join('')}</ul>
+      </details>`;
+
+    // Pendientes: sin cuenta guardada todavía; se quedan arriba y siempre abiertos, agrupados por cliente
+    const listaPendientes = visibles.filter(pendiente);
+    const gruposPendientes = porCliente(listaPendientes);
+    const htmlPendientes = gruposPendientes.size
+      ? `<div class="arbol__grupo arbol__grupo--pendientes">
+          <h3 class="arbol__titulo">Pendientes <span class="chip chip--alerta">${listaPendientes.length}</span></h3>
+          ${[...gruposPendientes.entries()].map(([rfc, g]) => clienteHtml(rfc, g, { forzar: true })).join('')}
+        </div>`
+      : '';
+
+    // Terminados: ya tienen cuenta; carpeta cerrada por defecto, ordenada mes (de la cuenta) → cliente → pedimento
+    const listaTerminados = visibles.filter((e) => !pendiente(e));
+    const claveMes = (e) => (e.cuenta_guardado ? e.cuenta_guardado.slice(0, 7) : '');
+    const etiquetaMes = (clave) => {
+      if (!clave) return 'Sin fecha';
+      const [anio, mes] = clave.split('-').map(Number);
+      const texto = new Date(anio, mes - 1, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+      return texto.charAt(0).toUpperCase() + texto.slice(1);
+    };
+    const porMes = new Map();
+    for (const e of listaTerminados) {
+      const clave = claveMes(e);
+      if (!porMes.has(clave)) porMes.set(clave, []);
+      porMes.get(clave).push(e);
+    }
+    const meses = [...porMes.keys()].sort((a, b) => b.localeCompare(a));
+    const htmlTerminados = listaTerminados.length
+      ? `<details class="arbol__grupo arbol__grupo--terminados" ${q || soloPendientes ? 'open' : ''}>
+          <summary class="arbol__titulo">Terminados <span class="muted">${listaTerminados.length}</span></summary>
+          ${meses.map((clave) => {
+            const lista = porMes.get(clave).sort((a, b) => a.cliente.localeCompare(b.cliente) || a.pedimento.localeCompare(b.pedimento));
+            const grupos = porCliente(lista);
+            return `<div class="arbol__mes">
+              <h4 class="arbol__submes">${esc(etiquetaMes(clave))}</h4>
+              ${[...grupos.entries()].map(([rfc, g]) => clienteHtml(rfc, g, { soloUno: grupos.size === 1 })).join('')}
+            </div>`;
+          }).join('')}
+        </details>`
+      : '';
+
+    $('#arbol-expedientes').innerHTML = htmlPendientes + htmlTerminados;
   }
 
   async function abrirExpediente(id, { silencioso = false } = {}) {
