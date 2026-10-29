@@ -61,7 +61,9 @@
     // Historial compartido en el servidor
     window.App.ganchos.historial = {
       listar: () => api('/cuentas'),
-      guardar: (registro) => api(`/cuentas/${encodeURIComponent(registro.id)}`, json('PUT', { cuenta: registro.cuenta, expediente_id: enCuenta?.id })),
+      // Al guardarse la cuenta, su expediente deja de estar pendiente
+      guardar: (registro) => api(`/cuentas/${encodeURIComponent(registro.id)}`, json('PUT', { cuenta: registro.cuenta, expediente_id: enCuenta?.id }))
+        .then(() => cargarExpedientes()),
       borrar: (id) => api(`/cuentas/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     };
     window.App.ganchos.nombreCliente = (rfc) => (enCuenta && enCuenta.rfc === rfc ? enCuenta.cliente : null);
@@ -113,7 +115,9 @@
     $('#usuario').textContent = usuario.nombre;
     $('#usuario').hidden = false;
     $('#btn-salir').hidden = false;
+    vistos = null; // al entrar se avisa cuántos pendientes hay
     await cargarExpedientes();
+    revisarCadaMinuto();
   }
 
   // ---------- Pestañas ----------
@@ -125,15 +129,53 @@
   }
 
   // ---------- Árbol Cliente → Pedimento ----------
+  // Un expediente está pendiente mientras no tenga cuenta de gastos guardada (se guarda al descargarla)
+  const pendiente = (e) => !e.cuenta;
+  let vistos = null; // ids de pendientes ya conocidos, para avisar solo de los nuevos
+
   async function cargarExpedientes() {
     expedientes = await api('/expedientes');
     pintarArbol();
+    pintarPendientes();
     if (abierto) abrirExpediente(abierto.id, { silencioso: true });
+  }
+
+  function pintarPendientes() {
+    const lista = expedientes.filter(pendiente);
+    const n = lista.length;
+    $('#insignia-pendientes').hidden = !n;
+    $('#insignia-pendientes').textContent = n;
+    $('#exp-pendientes').hidden = !n;
+    $('#exp-pendientes-texto').textContent = n === 1
+      ? '1 expediente esperando su cuenta de gastos'
+      : `${n} expedientes esperando su cuenta de gastos`;
+    document.title = `${n ? `(${n}) ` : ''}Comprobante de gastos · Villalobos`;
+    if (!n) $('#exp-solo-pendientes').checked = false;
+
+    // Aviso de los que llegaron desde la última revisión (la primera vez solo se cuentan)
+    const ids = new Set(lista.map((e) => e.id));
+    if (vistos) {
+      const nuevos = lista.filter((e) => !vistos.has(e.id));
+      if (nuevos.length === 1) aviso(`Nuevo expediente pendiente de cuenta de gastos: ${nuevos[0].cliente} · ${nuevos[0].pedimento}`);
+      else if (nuevos.length > 1) aviso(`${nuevos.length} expedientes nuevos pendientes de cuenta de gastos`);
+    } else if (n) {
+      aviso(n === 1 ? 'Hay 1 expediente esperando su cuenta de gastos.' : `Hay ${n} expedientes esperando su cuenta de gastos.`);
+    }
+    vistos = ids;
+  }
+
+  // Revisa cada minuto si alguien subió un expediente nuevo o ya hizo una cuenta
+  let revision = null;
+  function revisarCadaMinuto() {
+    clearInterval(revision);
+    revision = setInterval(() => { if (!document.querySelector('#login').open) cargarExpedientes().catch(() => {}); }, 60 * 1000);
   }
 
   function pintarArbol() {
     const q = Cuenta.normalizar($('#exp-buscar').value);
-    const visibles = expedientes.filter((e) => !q || Cuenta.normalizar(`${e.cliente} ${e.rfc} ${e.pedimento} ${e.referencia}`).includes(q));
+    const soloPendientes = $('#exp-solo-pendientes').checked;
+    const visibles = expedientes.filter((e) => (!soloPendientes || pendiente(e))
+      && (!q || Cuenta.normalizar(`${e.cliente} ${e.rfc} ${e.pedimento} ${e.referencia}`).includes(q)));
     const porCliente = new Map();
     for (const e of visibles) {
       if (!porCliente.has(e.rfc)) porCliente.set(e.rfc, { cliente: e.cliente, lista: [] });
@@ -141,16 +183,16 @@
     }
     $('#arbol-expedientes').innerHTML = porCliente.size
       ? [...porCliente.entries()].map(([rfc, g]) => `
-        <details class="arbol__cliente" ${q || porCliente.size === 1 || g.lista.some((e) => e.id === abierto?.id) ? 'open' : ''}>
-          <summary><strong>${esc(g.cliente)}</strong> <span class="muted">${esc(rfc)} · ${g.lista.length}</span></summary>
+        <details class="arbol__cliente" ${q || soloPendientes || porCliente.size === 1 || g.lista.some((e) => e.id === abierto?.id || pendiente(e)) ? 'open' : ''}>
+          <summary><strong>${esc(g.cliente)}</strong> <span class="muted">${esc(rfc)} · ${g.lista.length}</span>${g.lista.some(pendiente) ? ` <span class="chip chip--alerta">${g.lista.filter(pendiente).length} pendiente(s)</span>` : ''}</summary>
           <ul>${g.lista.map((e) => `
             <li class="arbol__ped${e.id === abierto?.id ? ' sel' : ''}" data-id="${e.id}">
               <span>${esc(e.pedimento)}${e.referencia ? ` <span class="chip">${esc(e.referencia)}</span>` : ''}</span>
-              <span class="muted">${e.archivos_expediente || 0} doc.${e.cuenta ? ` · cuenta ${esc(e.cuenta)}` : ''}</span>
+              <span class="muted">${e.archivos_expediente || 0} doc. ${pendiente(e) ? '<span class="chip chip--alerta">Falta cuenta</span>' : `<span class="chip">Cuenta ${esc(e.cuenta)}</span>`}</span>
             </li>`).join('')}
           </ul>
         </details>`).join('')
-      : `<p class="muted">${expedientes.length ? 'Ningún expediente coincide.' : 'Todavía no hay expedientes. Crea el primero con «+ Nuevo expediente».'}</p>`;
+      : `<p class="muted">${expedientes.length ? (soloPendientes ? 'No hay expedientes pendientes.' : 'Ningún expediente coincide.') : 'Todavía no hay expedientes. Crea el primero con «+ Nuevo expediente».'}</p>`;
   }
 
   async function abrirExpediente(id, { silencioso = false } = {}) {
@@ -175,7 +217,8 @@
         <div>
           <strong>${esc(abierto.cliente)}</strong>
           <div class="muted">${esc(abierto.rfc)} · Pedimento ${esc(abierto.pedimento)}${abierto.referencia ? ` · Ref. ${esc(abierto.referencia)}` : ''}</div>
-          <div class="muted">Creado por ${esc(abierto.creado_por_nombre || '—')}${abierto.cuenta ? ` · Cuenta de gastos ${esc(abierto.cuenta)}` : ''}</div>
+          <div class="muted">Creado por ${esc(abierto.creado_por_nombre || '—')}</div>
+          <div>${abierto.cuenta ? `<span class="chip">Cuenta de gastos ${esc(abierto.cuenta)}</span>` : '<span class="chip chip--alerta">Pendiente: falta la cuenta de gastos</span>'}</div>
         </div>
         <button type="button" class="btn-x" id="exp-cerrar" aria-label="Cerrar expediente">×</button>
       </div>
@@ -277,8 +320,9 @@
       if (archivosNuevo.length) await subirArchivos(exp.id, archivosNuevo, 'expediente');
       $('#dlg-expediente').close();
       abierto = exp;
+      vistos?.add(exp.id); // quien lo crea no necesita el aviso de "nuevo expediente"
       await cargarExpedientes();
-      aviso(`Expediente ${exp.pedimento} de ${exp.cliente} guardado con ${archivosNuevo.length} archivo(s).`);
+      aviso(`Expediente ${exp.pedimento} de ${exp.cliente} guardado con ${archivosNuevo.length} archivo(s). Queda pendiente su cuenta de gastos; el equipo lo verá en Expedientes.`);
     } catch (e) {
       err.textContent = e.message;
     } finally {
@@ -322,6 +366,7 @@
     if (b) cambiarPestana(b.dataset.pestana);
   });
   $('#exp-buscar').addEventListener('input', pintarArbol);
+  $('#exp-solo-pendientes').addEventListener('change', pintarArbol);
   $('#arbol-expedientes').addEventListener('click', (e) => {
     const li = e.target.closest('.arbol__ped');
     if (li) abrirExpediente(Number(li.dataset.id));

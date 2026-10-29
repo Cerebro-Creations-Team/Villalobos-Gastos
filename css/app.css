@@ -178,6 +178,10 @@ input.mono { font-family: Consolas, 'SF Mono', monospace; font-size: 12px; }
 .exp-actual { background: #f6eedb; border: 1px solid var(--oro); border-radius: var(--radio); padding: 8px 10px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .drop--chico { padding: 14px; }
+.insignia { display: inline-block; min-width: 20px; padding: 1px 6px; border-radius: 10px; background: var(--oro); color: var(--verde); font-size: 12px; font-weight: 700; margin-left: 4px; }
+.pendientes { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; background: #fdf0d8; border: 1px solid var(--alerta); border-radius: var(--radio); padding: 8px 10px; font-size: 13px; font-weight: 600; color: #7a4a10; }
+.pendientes .radio { color: #7a4a10; font-size: 12px; }
+.arbol__ped .chip { margin: 0 0 0 4px; }
 .nota-revisar { margin: 0; font-size: 13px; color: var(--alerta); font-weight: 600; }
 .nota-revisar:empty { display: none; }
 
