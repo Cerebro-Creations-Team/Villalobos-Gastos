@@ -102,9 +102,14 @@
     // la etiqueta "VALOR ADUANA:" no siempre queda en el mismo renglón que su número
     const valoresPartida = esPedimento ? [...t.matchAll(/^(\d+\.\d{5})\s+\d+(?:\.\d+)?\s+\d+\.\d+\s*$/gm)].map((m) => num(m[1])) : [];
     const vaPartidas = valoresPartida.length ? String(Math.round(valoresPartida.reduce((s, v) => s + v, 0) * 100) / 100) : '';
+    // RFC del importador (el primero que aparece; el del agente aduanal viene después) y referencia interna (REF: A91)
+    const rfcImportador = esPedimento ? (t.match(/Clave en el RFC:\s*([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})/) || [])[1] || '' : '';
+    const referencia = esPedimento ? (t.match(/\bREF:\s*([A-Z0-9]+)/) || [])[1] || '' : '';
     return {
       pedimento,
       esPedimento,
+      rfcImportador,
+      referencia,
       impuestos: impuestos ? num(impuestos) : 0,
       pais: [...new Set(paises)].join('/'),
       guia: guia ? normalizarGuia(guia) : '',
