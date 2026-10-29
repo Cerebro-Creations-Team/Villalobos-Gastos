@@ -37,6 +37,7 @@
     historial: null, // { listar(), guardar(registro), borrar(id) }
     nombreCliente: null, // (rfc) => nombre escrito en el expediente abierto, si no está en el catálogo
     despuesDeCargar: null, // () => liga la cuenta a su expediente por cliente y pedimento
+    alCambiar: null, // () => guarda la cuenta en su expediente (con espera, para no guardar en cada tecla)
   };
 
   const clientes = () => leerLocal(CLAVE_CLIENTES, {});
@@ -510,11 +511,13 @@
     llenarCampos();
     pintarCalculos();
     guardarLocal(CLAVE_BORRADOR, cuenta);
+    ganchos.alCambiar?.();
   }
 
   function cambio() {
     pintarCalculos();
     guardarLocal(CLAVE_BORRADOR, cuenta);
+    ganchos.alCambiar?.();
   }
 
   // ---------- Historial de cuentas descargadas ----------
@@ -838,7 +841,7 @@
 
   // Para expedientes.js y para pruebas desde la consola
   window.App = {
-    cargarArchivos, cargarDelExpediente, leerPedimento, reiniciarCuenta, abrirCuenta, hayCaptura, aviso,
+    cargarArchivos, cargarDelExpediente, leerPedimento, reiniciarCuenta, abrirCuenta, hayCaptura, aviso, idCuenta,
     ganchos, clientes, estado: () => cuenta, documentos: () => docs,
   };
 })();

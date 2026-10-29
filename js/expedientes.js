@@ -74,6 +74,7 @@
       guardarEnExpediente(enCuenta, archivos);
     };
     window.App.ganchos.despuesDeCargar = ligarPorPedimento;
+    window.App.ganchos.alCambiar = programarGuardado;
   }
 
   let pendientes = [];
@@ -152,16 +153,43 @@
     document.title = `${n ? `(${n}) ` : ''}Comprobante de gastos · Villalobos`;
     if (!n) $('#exp-solo-pendientes').checked = false;
 
-    // Aviso de los que llegaron desde la última revisión (la primera vez solo se cuentan)
+    // Avisos desde la última revisión: expedientes nuevos y cuentas que alguien ya terminó
+    // (la primera vez solo se cuentan; quien termina la cuenta recibe su propio aviso al guardarla)
     const ids = new Set(lista.map((e) => e.id));
     if (vistos) {
       const nuevos = lista.filter((e) => !vistos.has(e.id));
-      if (nuevos.length === 1) aviso(`Nuevo expediente pendiente de cuenta de gastos: ${nuevos[0].cliente} · ${nuevos[0].pedimento}`);
-      else if (nuevos.length > 1) aviso(`${nuevos.length} expedientes nuevos pendientes de cuenta de gastos`);
+      const terminados = [...vistos].filter((id) => !ids.has(id) && id !== enCuenta?.id)
+        .map((id) => expedientes.find((e) => e.id === id)).filter((e) => e?.cuenta);
+      const mensajes = [];
+      if (nuevos.length === 1) mensajes.push(`Nuevo expediente pendiente de cuenta de gastos: ${nuevos[0].cliente} · ${nuevos[0].pedimento}`);
+      else if (nuevos.length > 1) mensajes.push(`${nuevos.length} expedientes nuevos pendientes de cuenta de gastos`);
+      if (terminados.length === 1) mensajes.push(`Cuenta de gastos lista: ${terminados[0].cliente} · ${terminados[0].pedimento} (cuenta ${terminados[0].cuenta})`);
+      else if (terminados.length > 1) mensajes.push(`${terminados.length} cuentas de gastos terminadas`);
+      if (mensajes.length) aviso(mensajes.join(' · '));
     } else if (n) {
       aviso(n === 1 ? 'Hay 1 expediente esperando su cuenta de gastos.' : `Hay ${n} expedientes esperando su cuenta de gastos.`);
     }
     vistos = ids;
+  }
+
+  // La cuenta del expediente se guarda sola en cuanto está generada (tiene número y ya se leyó la factura
+  // de Villalobos), y se vuelve a guardar si se cambia algo. Así el expediente deja de estar pendiente
+  // aunque nadie descargue todavía el PDF o el Excel.
+  let esperaGuardado = null;
+  function programarGuardado() {
+    if (!enCuenta) return;
+    clearTimeout(esperaGuardado);
+    esperaGuardado = setTimeout(() => guardarCuentaSola().catch((e) => aviso(`No se pudo guardar la cuenta: ${e.message}`)), 1500);
+  }
+
+  async function guardarCuentaSola() {
+    const c = window.App.estado();
+    if (!enCuenta || !String(c.numero).trim() || c.cfdiTotal == null) return;
+    if (c.cliente.rfc.toUpperCase() !== enCuenta.rfc) return; // facturas de otro cliente: no se liga
+    const estabaPendiente = !expedientes.find((e) => e.id === enCuenta.id)?.cuenta;
+    await api(`/cuentas/${encodeURIComponent(window.App.idCuenta(c))}`, json('PUT', { cuenta: c, expediente_id: enCuenta.id }));
+    await cargarExpedientes();
+    if (estabaPendiente) aviso(`Cuenta ${c.numero} guardada en el expediente ${enCuenta.pedimento}; ya no está pendiente.`);
   }
 
   // Revisa cada minuto si alguien subió un expediente nuevo o ya hizo una cuenta
