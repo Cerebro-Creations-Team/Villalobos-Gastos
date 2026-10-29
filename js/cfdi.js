@@ -105,11 +105,18 @@
     // RFC del importador (el primero que aparece; el del agente aduanal viene después) y referencia interna (REF: A91)
     const rfcImportador = esPedimento ? (t.match(/Clave en el RFC:\s*([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})/) || [])[1] || '' : '';
     const referencia = esPedimento ? (t.match(/\bREF:\s*([A-Z0-9]+)/) || [])[1] || '' : '';
+    // Nombre del importador: en el pedimento completo va en el renglón de CURP (vacía en personas morales);
+    // en el acuse de la manifestación de valor viene como "Nombre o Razón Social del importador:"
+    const nombrePed = (t.match(/RAZON SOCIAL:[ \t]*\n[ \t]*CURP:[ \t]*(?:[A-Z]{4}\d{6}[A-Z0-9]{8}[ \t]+)?([^\n]{3,})/) || [])[1] || '';
+    const nombreAcuse = (t.match(/Raz[oó]n Social del importador:[ \t]*([^\n]{3,})/i) || [])[1] || '';
+    const nombreImportador = (nombrePed || nombreAcuse).trim();
     return {
       pedimento,
       esPedimento,
       rfcImportador,
       referencia,
+      nombreImportador,
+      nombreDe: nombrePed ? 'pedimento' : nombreAcuse ? 'acuse de la manifestación de valor' : '',
       impuestos: impuestos ? num(impuestos) : 0,
       pais: [...new Set(paises)].join('/'),
       guia: guia ? normalizarGuia(guia) : '',

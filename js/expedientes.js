@@ -230,17 +230,34 @@
   async function elegirArchivosNuevo(lista) {
     archivosNuevo = Array.from(lista).filter((f) => /\.(pdf|xml)$/i.test(f.name));
     $('#dlg-exp-lista').textContent = archivosNuevo.length ? `${archivosNuevo.length} archivo(s): ${archivosNuevo.map((f) => f.name).join(', ')}` : 'Ningún archivo elegido';
-    // Si entre ellos viene el pedimento con texto, se llenan los datos
+    // Si entre ellos viene el pedimento con texto, se llenan los datos. El nombre del cliente se toma
+    // del catálogo (como lo escriben en sus cuentas) o, si no está, del pedimento o del acuse de valor.
+    const poner = (sel, v) => { if (v && !$(sel).value) $(sel).value = v; };
+    let ped = null;
+    let nombre = null; // { texto, de }
     for (const f of archivosNuevo.filter((x) => /\.pdf$/i.test(x.name))) {
       const d = await window.App.leerPedimento(f);
-      if (!d?.esPedimento) continue;
-      const poner = (sel, v) => { if (v && !$(sel).value) $(sel).value = v; };
-      poner('#dlg-exp-pedimento', d.pedimento);
-      poner('#dlg-exp-rfc', d.rfcImportador);
-      poner('#dlg-exp-ref', d.referencia);
-      const cat = window.App.clientes()[d.rfcImportador];
-      poner('#dlg-exp-cliente', cat?.nombre);
-      break;
+      if (!d) continue;
+      if (d.esPedimento && !ped) ped = d;
+      if (d.nombreImportador && (!nombre || (d.nombreDe === 'pedimento' && nombre.de !== 'pedimento'))) {
+        nombre = { texto: d.nombreImportador, de: d.nombreDe };
+      }
+      if (ped && nombre?.de === 'pedimento') break;
+    }
+    if (ped) {
+      poner('#dlg-exp-pedimento', ped.pedimento);
+      poner('#dlg-exp-rfc', ped.rfcImportador);
+      poner('#dlg-exp-ref', ped.referencia);
+    }
+    const cat = window.App.clientes()[$('#dlg-exp-rfc').value.trim().toUpperCase()];
+    const campo = $('#dlg-exp-cliente');
+    const nota = $('#dlg-exp-nota');
+    if (!campo.value && (cat?.nombre || nombre)) {
+      campo.value = cat?.nombre || nombre.texto;
+      campo.classList.add('auto');
+      nota.textContent = cat?.nombre
+        ? 'Nombre tomado del catálogo de clientes. Revisa que sea correcto antes de crear el expediente.'
+        : `Nombre leído del ${nombre.de}. Revisa que sea correcto (por ejemplo «S.A.» o «S.A. de C.V.») antes de crear el expediente.`;
     }
   }
 
@@ -272,6 +289,8 @@
   function abrirDialogoNuevo() {
     archivosNuevo = [];
     for (const id of ['#dlg-exp-rfc', '#dlg-exp-cliente', '#dlg-exp-pedimento', '#dlg-exp-ref']) $(id).value = '';
+    $('#dlg-exp-cliente').classList.remove('auto');
+    $('#dlg-exp-nota').textContent = '';
     $('#dlg-exp-lista').textContent = 'Ningún archivo elegido';
     $('#dlg-exp-error').textContent = '';
     $('#dlg-expediente').showModal();
@@ -343,6 +362,8 @@
   ['dragleave', 'drop'].forEach((ev) => dropNuevo.addEventListener(ev, () => dropNuevo.classList.remove('activo')));
   dropNuevo.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); elegirArchivosNuevo(e.dataTransfer.files); });
   $('#dlg-exp-guardar').addEventListener('click', guardarNuevo);
+  // Si la persona corrige el nombre, deja de marcarse como leído automáticamente
+  $('#dlg-exp-cliente').addEventListener('input', (e) => { e.target.classList.remove('auto'); $('#dlg-exp-nota').textContent = ''; });
 
   iniciar();
 })();

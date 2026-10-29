@@ -178,6 +178,8 @@ input.mono { font-family: Consolas, 'SF Mono', monospace; font-size: 12px; }
 .exp-actual { background: #f6eedb; border: 1px solid var(--oro); border-radius: var(--radio); padding: 8px 10px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .drop--chico { padding: 14px; }
+.nota-revisar { margin: 0; font-size: 13px; color: var(--alerta); font-weight: 600; }
+.nota-revisar:empty { display: none; }
 
 .login { border: 0; border-radius: 12px; padding: 28px; width: min(380px, calc(100% - 32px)); box-shadow: 0 10px 40px rgba(0,0,0,.25); }
 .login::backdrop { background: var(--verde); }
