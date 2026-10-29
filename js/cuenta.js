@@ -21,7 +21,12 @@
   // Proveedores conocidos: en qué renglón van y qué referencia llevan.
   // ref: 'folio' -> "Serie-Folio" de la factura; cualquier otro texto se usa tal cual.
   // TME aparece igual de seguido en ALMACENAJES (con su folio) que en GASTOS DE MANIOBRAS ("TME04").
+  // La clave es el RFC, o "RFC|SERIE" cuando un mismo proveedor manda facturas que van a renglones distintos
+  // (FedEx: MEXIFA es revalidación de guía, BTLC es el tránsito desde Toluca).
   const PROVEEDORES_BASE = {
+    BTC920330IPA: { nombre: 'TALMA SERVICIOS DE CARGA', concepto: 'ALMACENAJES', ref: 'TALMA' },
+    'FEH940630UG2|MEXIFA': { nombre: 'FEDERAL EXPRESS HOLDINGS (MEXICO)', concepto: 'GASTOS DE MANIOBRAS', ref: 'REVALIDACION' },
+    'FEH940630UG2|BTLC': { nombre: 'FEDERAL EXPRESS HOLDINGS (MEXICO)', concepto: 'OTROS GASTOS', ref: 'TRANSITO' },
     AAM401115988: { nombre: 'TME RECINTO FISCALIZADO', concepto: 'ALMACENAJES', ref: 'folio' },
     MCH070116DN9: { nombre: 'MEXICO CARGO HANDLING', concepto: 'GASTOS DE MANIOBRAS', ref: 'DESCONSOLIDACION' },
     DIBN800222GL7: { nombre: 'NORMAN DIAZ BERRY', concepto: 'OTROS GASTOS', ref: 'CUSTODIA' },
@@ -29,10 +34,11 @@
   };
 
   // Preferencias del acomodo que cambian de una cuenta a otra; la app recuerda las últimas usadas.
+  // Valores iniciales tomados de la cuenta más reciente de referencia (127, Coramex, octubre 2026)
   const FORMATO_BASE = {
-    etiquetaFlete: 'FLETE AEREO',
-    minOtros: 3,
-    oficinas: ['Veracruz, Veracruz', 'Toluca, Estado de México', 'Pantaco, Distrito Federal'],
+    etiquetaFlete: 'FLETE',
+    minOtros: 2,
+    oficinas: ['Ciudad de México, Pantaco', 'AIFA, Estado de México', 'Veracruz, Veracruz'],
   };
 
   const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
@@ -67,11 +73,11 @@
     return h ? h.clave : 'otros';
   }
 
-  // "2026-10-21T12:45:35" -> "21 de octubre 2026"
+  // "2026-10-29T12:49:02" -> "29 de octubre del 2026"
   function fechaLarga(iso) {
     const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (!m) return '';
-    return `${Number(m[3])} de ${MESES[Number(m[2]) - 1]} ${m[1]}`;
+    return `${Number(m[3])} de ${MESES[Number(m[2]) - 1]} del ${m[1]}`;
   }
 
   function calcular(c) {
@@ -122,13 +128,13 @@
 
   const dinero = (v) => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // "01B 0.800KG *CHE*  VM $51,338.00  IMP $9,133.00 GTOS $10,784.40MN"
+  // Formato de la cuenta 127: 02B* 18.400KG* "ITA" VM. $499,870.00MN* IMP. $85,001.00MN* GTOS $13,431.60MN*
   function lineaResumen(c, t) {
     const bultos = String(parseInt(c.bultos, 10) || 0).padStart(2, '0');
     const peso = (parseFloat(String(c.peso).replace(/,/g, '')) || 0).toFixed(3);
     const pais = (c.pais || '').trim().toUpperCase();
     const va = parseFloat(String(c.valorAduana).replace(/,/g, '')) || 0;
-    return `${bultos}B ${peso}KG ${pais ? `*${pais}* ` : ''} VM $${dinero(va)}  IMP $${dinero(c.impuestos)} GTOS $${dinero(t.gastos)}MN`;
+    return `${bultos}B* ${peso}KG* ${pais ? `"${pais}" ` : ''}VM. $${dinero(va)}MN* IMP. $${dinero(c.impuestos)}MN* GTOS $${dinero(t.gastos)}MN*`;
   }
 
   const api = {

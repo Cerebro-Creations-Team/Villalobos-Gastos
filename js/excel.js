@@ -33,15 +33,13 @@
     poner(`G${r + 2}`, 'Patente 2043', { tam: 10 });
     const dirAgencia = ['Sinaloa No 129 Desp 401', 'Col. Peñón de los Baños', 'Del. Venustiano Carranza', 'CP 15520 México, D.F.', 'RFC AAV2011279Q7'];
     dirAgencia.forEach((txt, i) => poner(`B${r + 3 + i}`, txt, { fuente: 'Albertus Medium', tam: 8 }));
-    poner(`J${r + 4}`, '                               ISO 9001: 2008', { tam: 7, b: false });
-    poner(`J${r + 5}`, '                            No de Cert 84876', { tam: 7, b: false });
     poner(`J${r + 6}`, 'Teléfonos : ', { fuente: 'Albertus Medium', tam: 7 });
     ['55 5784 2327', '55 5762 3141', '55 5784 2264'].forEach((tel, i) => poner(`K${r + 6 + i}`, tel, { tam: 8, b: false }));
     poner(`B${r + 8}`, 'COMPROBANTE DE GASTOS NO', { tam: 8 });
     alto(r + 9, 18);
     poner(`C${r + 9}`, numeroOTexto(c.numero), { tam: 14, al: 'center', fmt: '0' });
     poner(`F${r + 10}`, `${c.lugar} ${c.fecha}`.trim(), { tam: 10, b: false });
-    poner(`J${r + 10}`, 'Contacto : información@jargeco.com.mx', { tam: 8, b: false });
+    poner(`J${r + 10}`, 'Contacto : información@villalobosaduanal.com', { tam: 8, b: false });
     alto(r + 11, 13.5);
 
     // ---------- Datos del cliente ----------

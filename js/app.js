@@ -91,9 +91,24 @@
     let texto = '';
     for (let p = 1; p <= pdf.numPages; p++) {
       const contenido = await (await pdf.getPage(p)).getTextContent();
-      texto += contenido.items.map((i) => i.str + (i.hasEOL ? '\n' : ' ')).join('') + '\n';
+      texto += lineasPorPosicion(contenido.items) + '\n';
     }
     return { texto, paginas: pdf.numPages };
+  }
+
+  // pdf.js entrega el texto en el orden en que se dibujó, que en formatos como el pedimento separa
+  // cada etiqueta de su valor. Se rearma por renglones según la posición en la página.
+  function lineasPorPosicion(items) {
+    const piezas = items.filter((i) => i.str && i.str.trim())
+      .map((i) => ({ x: i.transform[4], y: i.transform[5], alto: Math.abs(i.transform[3]) || i.height || 8, str: i.str }))
+      .sort((a, b) => b.y - a.y || a.x - b.x);
+    const renglones = [];
+    for (const pz of piezas) {
+      const r = renglones[renglones.length - 1];
+      if (r && Math.abs(r.y - pz.y) <= Math.min(r.alto, pz.alto) * 0.5) r.piezas.push(pz);
+      else renglones.push({ y: pz.y, alto: pz.alto, piezas: [pz] });
+    }
+    return renglones.map((r) => r.piezas.sort((a, b) => a.x - b.x).map((pz) => pz.str.trim()).join(' ')).join('\n');
   }
 
   // ---------- Carga de archivos ----------
@@ -156,6 +171,8 @@
     if (doc.pdf.escaneado) return;
     const d = CFDI.datosDeTextoPDF(r.texto);
     doc.pdf.datos = d;
+    ponerSiVacio('impuestos', d.impuestos);
+    ponerSiVacio('pais', d.pais);
     ponerSiVacio('guia', d.guia);
     ponerSiVacio('guiaHouse', d.guiaHouse);
     ponerSiVacio('bultos', d.bultos);
@@ -179,8 +196,9 @@
       cuenta.cliente = {
         rfc,
         nombre: guardado?.nombre || f.receptor.nombre,
-        dom1: guardado?.dom1 || (dom ? n(`${dom.calle} NO.${dom.numero}${dom.interior ? ' INT. ' + dom.interior : ''} COL. ${dom.colonia}`) : ''),
-        dom2: guardado?.dom2 || (dom ? n(`${dom.ciudad}  CP.${dom.cp}`) : ''),
+        // Sin catálogo se arma como en la cuenta 127: "LAURO VILLAR NO.94-B COL. PROVIDENCIA" / "AZCAPOTZALCO CIUDAD DE MEXICO C.P.02440"
+        dom1: guardado?.dom1 || (dom ? n(`${dom.calle} NO.${dom.numero}${dom.interior ? '-' + dom.interior : ''} COL. ${dom.colonia}`) : ''),
+        dom2: guardado?.dom2 || (dom ? n([dom.municipio, dom.estado || dom.ciudad, `C.P.${dom.cp}`].filter(Boolean).join(' ')) : ''),
       };
       ['cliente.rfc', 'cliente.nombre', 'cliente.dom1', 'cliente.dom2'].forEach((c) => camposAuto.add(c));
     }
@@ -191,10 +209,16 @@
     for (const c of f.conceptos) {
       const clave = Cuenta.claveHonorario(c.descripcion);
       cuenta.honorarios[clave].importe = Math.round((cuenta.honorarios[clave].importe + c.importe) * 100) / 100;
-      if (clave === 'otros') otros.push(Cuenta.normalizar(c.descripcion));
+      // Un concepto que no es de los renglones fijos se anota como referencia de OTROS CARGOS (salvo que se llame así)
+      if (clave === 'otros' && Cuenta.normalizar(c.descripcion) !== 'OTROS CARGOS') otros.push(Cuenta.normalizar(c.descripcion));
       camposAuto.add(`honorarios.${clave}.importe`);
     }
     if (otros.length) cuenta.honorarios.otros.ref = otros.join(', ');
+    // Referencias más comunes en su libro de cuentas: honorarios de $5,000 llevan "TARIFA MINIMA" (82%)
+    // y gastos varios con importe llevan "VUCEM" (78%). Se proponen solo si el campo está vacío.
+    const h = cuenta.honorarios;
+    if (!h.honorarios.ref && h.honorarios.importe === 5000) h.honorarios.ref = 'TARIFA MINIMA';
+    if (!h.varios.ref && h.varios.importe > 0) h.varios.ref = 'VUCEM';
     cuenta.cfdiTotal = f.total;
     cuenta.cfdiRfcCliente = rfc;
   }
@@ -211,7 +235,8 @@
 
   function agregarGasto(f, docId) {
     if (cuenta.gastos.some((g) => g.uuid && g.uuid === f.uuid)) return;
-    const prov = proveedores()[f.emisor.rfc];
+    const catalogo = proveedores();
+    const prov = catalogo[claveProveedor(f.emisor.rfc, f.serie)] || catalogo[f.emisor.rfc];
     cuenta.gastos.push({
       id: nuevoId(), docId, uuid: f.uuid,
       concepto: prov?.concepto || adivinarConcepto(f),
@@ -222,12 +247,14 @@
     });
   }
 
-  // Si el usuario cambia el renglón o la referencia de una factura, se recuerda para ese proveedor
+  const claveProveedor = (rfc, serie) => (serie ? `${rfc}|${String(serie).toUpperCase()}` : rfc);
+
+  // Si el usuario cambia el renglón o la referencia de una factura, se recuerda para ese proveedor y serie
   function recordarProveedor(g) {
     if (!g.rfcEmisor) return;
     const guardados = leerLocal(CLAVE_PROVEEDORES, {});
     const usaFolio = g.folio && g.referencia.includes(g.folio);
-    guardados[g.rfcEmisor] = { nombre: g.nombreEmisor || g.origen, concepto: g.concepto, ref: usaFolio ? 'folio' : g.referencia };
+    guardados[claveProveedor(g.rfcEmisor, g.serie)] = { nombre: g.nombreEmisor || g.origen, concepto: g.concepto, ref: usaFolio ? 'folio' : g.referencia };
     guardarLocal(CLAVE_PROVEEDORES, guardados);
   }
 

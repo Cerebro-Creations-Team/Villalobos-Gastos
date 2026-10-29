@@ -57,6 +57,7 @@
     const domicilio = dir ? {
       calle: attr(dir, 'cNombreC01'), numero: attr(dir, 'cNumeroE01'), interior: attr(dir, 'cNumeroI01'),
       colonia: attr(dir, 'cColonia'), cp: attr(dir, 'cCodigoP01'), ciudad: attr(dir, 'cCiudad'),
+      municipio: attr(dir, 'cMunicipio'), estado: attr(dir, 'cEstado'),
     } : null;
 
     const rfcEmisor = attr(emisor, 'Rfc').toUpperCase();
@@ -89,15 +90,28 @@
       for (const re of res) { const m = t.match(re); if (m) return m[1].trim(); }
       return '';
     };
-    const guia = primero(/Gu[ií]a\s+Master:\s*([\d][\d\s-]{6,}\d)/i, /Mawb:\s*([\d-]{8,})/i, /Gu[ií]a\s+No\.?\s*:?\s*([\d-]{8,})/i);
     const pedimento = buscarPedimento(t.replace(/Pedimento:\s*0\s*-\s*0+/i, ''));
+    // El propio pedimento (forma simplificada o completa) trae el cuadro de liquidación y los datos de la guía
+    const esPedimento = /CUADRO DE LIQUIDACI[OÓ]N/i.test(t) && /NUM\.?\s*PEDIMENTO/i.test(t);
+    const guiaPed = esPedimento ? t.match(/GUIA\/ORDEN EMBARQUE\)\/ID:\s*([0-9A-Z-]+)\s+M\b(?:\s+([0-9A-Z-]+)\s+H\b)?/i) : null;
+    const guia = guiaPed ? guiaPed[1] : primero(/Gu[ií]a\s+Master:\s*([\d][\d\s-]{6,}\d)/i, /Mawb:\s*([\d-]{8,})/i, /Gu[ií]a\s+No\.?\s*:?\s*([\d-]{8,})/i);
+    const impuestos = esPedimento ? primero(/CUADRO DE LIQUIDACI[OÓ]N[\s\S]{0,800}?\bTOTAL\s+([\d,]+(?:\.\d+)?)/i) : '';
+    // País de origen: columna P. O/D de las partidas (la segunda clave antes de IGI/IGE)
+    const paises = esPedimento ? [...t.matchAll(/\b[A-Z]{3}\s+([A-Z]{3})\s+(?:[\d.]+\s+)?IGI\/IGE/g)].map((m) => m[1]) : [];
+    // Valor aduana del pedimento: suma de la columna VAL. ADU de las partidas (renglón "499870.00000 499870 14282.01000");
+    // la etiqueta "VALOR ADUANA:" no siempre queda en el mismo renglón que su número
+    const valoresPartida = esPedimento ? [...t.matchAll(/^(\d+\.\d{5})\s+\d+(?:\.\d+)?\s+\d+\.\d+\s*$/gm)].map((m) => num(m[1])) : [];
+    const vaPartidas = valoresPartida.length ? String(Math.round(valoresPartida.reduce((s, v) => s + v, 0) * 100) / 100) : '';
     return {
       pedimento,
+      esPedimento,
+      impuestos: impuestos ? num(impuestos) : 0,
+      pais: [...new Set(paises)].join('/'),
       guia: guia ? normalizarGuia(guia) : '',
-      bultos: primero(/Bultos:\s*(\d+)/i, /Piezas:\s*(\d+)/i),
-      peso: primero(/Peso\s*\(Kgs\):\s*([\d.,]+)/i, /Peso:\s*([\d.,]+)/i),
-      valorAduana: primero(/Valor\s+Aduana:\s*([\d.,]+)/i),
-      guiaHouse: primero(/Gu[ií]a\s+House:[ \t]*(\d[0-9A-Z/-]{3,})/),
+      bultos: primero(/Bultos:\s*(\d+)/i, /Piezas:\s*(\d+)/i, /TOTAL DE BULTOS:[^\n]*?(\d+)[ \t]*$/im),
+      peso: primero(/Peso\s*\(Kgs\):\s*([\d.,]+)/i, /PESO BRUTO:\s*([\d.,]+)/i, /Peso:\s*([\d.,]+)/i),
+      valorAduana: vaPartidas || primero(/Valor\s+Aduana:\s*(\d[\d,]{2,}(?:\.\d+)?)/i),
+      guiaHouse: guiaPed && guiaPed[2] ? guiaPed[2] : primero(/Gu[ií]a\s+House:[ \t]*(\d[0-9A-Z/-]{3,})/),
       // En el formato el COVE se escribe sin el prefijo: COVE268CCTKB3 -> 268CCTKB3
       cove: primero(/\bCOVE([0-9A-Z]{9})\b/),
     };

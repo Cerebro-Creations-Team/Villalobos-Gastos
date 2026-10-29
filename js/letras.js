@@ -1,5 +1,5 @@
 // Importe con letra, en el formato que usa el comprobante de gastos:
-// 33772.44 -> "TREINTA Y TRES MIL SETECIENTOS SETENTA Y DOS PESOS 44/100MN"
+// 115587.84 -> "CIENTO QUINCE MIL QUINIENTOS OCHENTA Y SIETE PESOS 84/100 MN"
 (function (global) {
   const UNIDADES = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE',
     'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO',
@@ -47,7 +47,7 @@
     const palabra = pesos === 1 ? 'PESO' : 'PESOS';
     // "UN MILLON PESOS" -> "UN MILLON DE PESOS"
     const de = pesos >= 1e6 && pesos % 1e6 === 0 ? 'DE ' : '';
-    return `${enteroALetras(pesos)} ${de}${palabra} ${centavos}/100MN`;
+    return `${enteroALetras(pesos)} ${de}${palabra} ${centavos}/100 MN`;
   }
 
   const api = { importeConLetra, enteroALetras };
