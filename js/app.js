@@ -36,6 +36,7 @@
     alSubirArchivos: null, // (files) => sube los archivos de la cuenta al expediente abierto
     historial: null, // { listar(), guardar(registro), borrar(id) }
     nombreCliente: null, // (rfc) => nombre escrito en el expediente abierto, si no está en el catálogo
+    despuesDeCargar: null, // () => liga la cuenta a su expediente por cliente y pedimento
   };
 
   const clientes = () => leerLocal(CLAVE_CLIENTES, {});
@@ -142,6 +143,7 @@
       pintarDocs();
     }
     pintarTodo();
+    if (subir && ganchos.despuesDeCargar) await ganchos.despuesDeCargar();
   }
 
   // Archivos que ya están en el expediente: de los PDF de la primera etapa solo se usa el pedimento

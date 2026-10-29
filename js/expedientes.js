@@ -65,13 +65,48 @@
       borrar: (id) => api(`/cuentas/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     };
     window.App.ganchos.nombreCliente = (rfc) => (enCuenta && enCuenta.rfc === rfc ? enCuenta.cliente : null);
-    // Lo que se suba a la cuenta queda guardado en el expediente abierto
+    // Lo que se suba a la cuenta queda guardado en su expediente. Si todavía no se sabe cuál es,
+    // se guardan después de leer la factura de Villalobos (cliente + pedimento).
     window.App.ganchos.alSubirArchivos = (archivos) => {
-      if (!enCuenta) return;
-      subirArchivos(enCuenta.id, archivos, 'cuenta')
-        .then(() => cargarExpedientes())
-        .catch((e) => aviso(`No se pudieron guardar en el expediente: ${e.message}`));
+      if (!enCuenta) { pendientes.push(...archivos); return; }
+      guardarEnExpediente(enCuenta, archivos);
     };
+    window.App.ganchos.despuesDeCargar = ligarPorPedimento;
+  }
+
+  let pendientes = [];
+  function guardarEnExpediente(exp, archivos) {
+    return subirArchivos(exp.id, archivos, 'cuenta')
+      .then(() => cargarExpedientes())
+      .catch((e) => aviso(`No se pudieron guardar en el expediente: ${e.message}`));
+  }
+
+  // Si la cuenta se empezó sin abrir el expediente, se busca por el RFC del cliente y el pedimento
+  // que traen las facturas, y se toma de ahí el pedimento que se subió en la primera etapa.
+  async function ligarPorPedimento() {
+    if (enCuenta) return;
+    const c = window.App.estado();
+    if (!c.cliente.rfc || !c.pedimento) return; // aún no llega la factura de Villalobos
+    await cargarExpedientes().catch(() => {});
+    const exp = expedientes.find((e) => e.rfc === c.cliente.rfc.toUpperCase() && e.pedimento === c.pedimento);
+    if (!exp) {
+      aviso(`No hay expediente del pedimento ${c.pedimento} para ${c.cliente.rfc}. Créalo en la pestaña Expedientes para que se guarden los archivos.`);
+      return;
+    }
+    try {
+      enCuenta = await api(`/expedientes/${exp.id}`);
+    } catch (e) { aviso(e.message); return; }
+    pintarExpedienteActual();
+    const archivos = pendientes;
+    pendientes = [];
+    if (archivos.length) guardarEnExpediente(enCuenta, archivos);
+    // Pedimento de la primera etapa (solo si no se subió también en esta)
+    const yaHayPedimento = window.App.documentos().some((d) => d.pdf?.datos?.esPedimento);
+    const n = yaHayPedimento ? 0 : await window.App.cargarDelExpediente(
+      await Promise.all(enCuenta.archivos.filter((a) => a.etapa === 'expediente' && a.tipo === 'pdf').map(archivoComoFile)), []);
+    aviso(n
+      ? `Cuenta ligada al expediente ${enCuenta.pedimento}: se tomó el pedimento de la primera etapa.`
+      : `Cuenta ligada al expediente ${enCuenta.pedimento}.`);
   }
 
   async function entrar(usuario) {
@@ -158,6 +193,7 @@
     if (window.App.hayCaptura() && enCuenta?.id !== exp.id
       && !confirm('Se va a empezar la cuenta de este pedimento y se reemplaza lo que tienes capturado. ¿Continuar?')) return;
     window.App.reiniciarCuenta();
+    pendientes = [];
     enCuenta = exp;
     pintarExpedienteActual();
     cambiarPestana('cuenta');
@@ -297,7 +333,7 @@
     abrirExpediente(enCuenta.id);
   });
   // "Nueva cuenta" suelta la cuenta del expediente
-  document.addEventListener('vg:cuenta-nueva', () => { enCuenta = null; pintarExpedienteActual(); });
+  document.addEventListener('vg:cuenta-nueva', () => { enCuenta = null; pendientes = []; pintarExpedienteActual(); });
 
   $('#btn-exp-nuevo').addEventListener('click', abrirDialogoNuevo);
   $('#dlg-exp-cerrar').addEventListener('click', () => $('#dlg-expediente').close());
