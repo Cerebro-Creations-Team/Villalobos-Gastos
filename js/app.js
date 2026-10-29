@@ -30,6 +30,14 @@
   let docSeleccionado = null;
   const camposAuto = new Set();
 
+  // Con servidor (expedientes.js) estos ganchos guardan archivos y cuentas en el servidor.
+  // Sin servidor (GitHub Pages) se quedan en null y la app trabaja solo en el navegador, como siempre.
+  const ganchos = {
+    alSubirArchivos: null, // (files) => sube los archivos de la cuenta al expediente abierto
+    historial: null, // { listar(), guardar(registro), borrar(id) }
+    nombreCliente: null, // (rfc) => nombre escrito en el expediente abierto, si no está en el catálogo
+  };
+
   const clientes = () => leerLocal(CLAVE_CLIENTES, {});
   const proveedores = () => Object.assign({}, Cuenta.PROVEEDORES_BASE, leerLocal(CLAVE_PROVEEDORES, {}));
 
@@ -61,9 +69,9 @@
   let temporizadorAviso;
   function aviso(msg) {
     const el = $('#aviso');
-    // Con la ventana del historial abierta, el aviso tiene que ir dentro de ella para verse encima
-    const dlg = $('#historial');
-    (dlg.open ? dlg : document.body).appendChild(el);
+    // Con una ventana abierta (historial, expediente…), el aviso tiene que ir dentro de ella para verse encima
+    const dlg = document.querySelector('dialog[open]');
+    (dlg || document.body).appendChild(el);
     el.textContent = msg;
     el.classList.add('ver');
     clearTimeout(temporizadorAviso);
@@ -114,9 +122,10 @@
   // ---------- Carga de archivos ----------
   const baseNombre = (n) => n.replace(/\.[^.]+$/, '').toLowerCase();
 
-  async function cargarArchivos(lista) {
+  async function cargarArchivos(lista, { subir = true } = {}) {
     const archivos = Array.from(lista).filter((f) => /\.(xml|pdf)$/i.test(f.name));
     if (!archivos.length) { aviso('Solo se aceptan archivos XML y PDF'); return; }
+    if (subir && ganchos.alSubirArchivos) ganchos.alSubirArchivos(archivos);
     // Los XML primero: así la factura de Villalobos y los gastos se aplican antes que los datos de los PDF
     archivos.sort((a, b) => (/\.xml$/i.test(a.name) ? 0 : 1) - (/\.xml$/i.test(b.name) ? 0 : 1));
     for (const archivo of archivos) {
@@ -133,6 +142,27 @@
       pintarDocs();
     }
     pintarTodo();
+  }
+
+  // Archivos que ya están en el expediente: de los PDF de la primera etapa solo se usa el pedimento
+  // (cartas, guía escaneada, traducción… no entran a la cuenta); los de la cuenta se cargan completos.
+  async function cargarDelExpediente(archivosExpediente, archivosCuenta) {
+    const pedimentos = [];
+    for (const f of archivosExpediente.filter((x) => /\.pdf$/i.test(x.name))) {
+      const d = await leerPedimento(f);
+      if (d?.esPedimento) pedimentos.push(f);
+    }
+    const todos = [...archivosCuenta, ...pedimentos];
+    if (todos.length) await cargarArchivos(todos, { subir: false });
+    return pedimentos.length;
+  }
+
+  // Lee un PDF y devuelve sus datos si es un pedimento con texto (para prellenar el expediente nuevo)
+  async function leerPedimento(archivo) {
+    try {
+      const r = await textoDePDF(archivo);
+      return r ? CFDI.datosDeTextoPDF(r.texto) : null;
+    } catch { return null; }
   }
 
   async function cargarXML(doc, archivo) {
@@ -195,7 +225,7 @@
       const n = Cuenta.normalizar;
       cuenta.cliente = {
         rfc,
-        nombre: guardado?.nombre || f.receptor.nombre,
+        nombre: guardado?.nombre || ganchos.nombreCliente?.(rfc) || f.receptor.nombre,
         // Sin catálogo se arma como en la cuenta 127: "LAURO VILLAR NO.94-B COL. PROVIDENCIA" / "AZCAPOTZALCO CIUDAD DE MEXICO C.P.02440"
         dom1: guardado?.dom1 || (dom ? n(`${dom.calle} NO.${dom.numero}${dom.interior ? '-' + dom.interior : ''} COL. ${dom.colonia}`) : ''),
         dom2: guardado?.dom2 || (dom ? n([dom.municipio, dom.estado || dom.ciudad, `C.P.${dom.cp}`].filter(Boolean).join(' ')) : ''),
@@ -487,14 +517,24 @@
 
   // ---------- Historial de cuentas descargadas ----------
   // Se guardan los datos de la cuenta (no los archivos); el Excel y el PDF se vuelven a generar al pedirlos.
-  const historial = () => leerLocal(CLAVE_HISTORIAL, []);
+  // Con servidor el historial es compartido; sin servidor vive en este navegador.
+  const historialLocal = () => leerLocal(CLAVE_HISTORIAL, []);
+  let historialCache = [];
+  const historial = async () => {
+    historialCache = ganchos.historial ? await ganchos.historial.listar() : historialLocal();
+    return historialCache;
+  };
   const idCuenta = (c) => `${(c.cliente.rfc || 'SINRFC').toUpperCase()}-${String(c.numero || '').trim() || 'SN'}`;
 
   function guardarEnHistorial() {
-    const lista = historial();
     const id = idCuenta(cuenta);
     const copia = JSON.parse(JSON.stringify(cuenta));
     const registro = { id, guardado: new Date().toISOString(), cuenta: copia };
+    if (ganchos.historial) {
+      ganchos.historial.guardar(registro).catch((e) => aviso(`No se pudo guardar la cuenta en el servidor: ${e.message}`));
+      return;
+    }
+    const lista = historialLocal();
     const i = lista.findIndex((h) => h.id === id);
     if (i >= 0) lista.splice(i, 1);
     lista.unshift(registro);
@@ -510,8 +550,11 @@
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  function pintarHistorial() {
-    const lista = historial();
+  async function pintarHistorial({ recargar = true } = {}) {
+    let lista = historialCache;
+    if (recargar) {
+      try { lista = await historial(); } catch (e) { aviso(`No se pudo leer el historial: ${e.message}`); }
+    }
     const q = Cuenta.normalizar($('#historial-buscar').value);
     const visibles = lista.filter((h) => {
       if (!q) return true;
@@ -540,7 +583,7 @@
   }
 
   async function accionHistorial(id, accion) {
-    const lista = historial();
+    const lista = historialCache;
     const h = lista.find((x) => x.id === id);
     if (!h) return;
     // Las cuentas guardadas con versiones anteriores reciben los campos nuevos con su valor por omisión
@@ -558,14 +601,16 @@
       $('#historial').close();
       aviso(`Cuenta ${c.numero} abierta. Los documentos originales no se guardan; vuelve a subirlos si los necesitas.`);
     } else if (accion === 'borrar') {
-      if (!confirm(`¿Borrar la cuenta ${c.numero} del historial de esta computadora?`)) return;
-      guardarLocal(CLAVE_HISTORIAL, lista.filter((x) => x.id !== id));
+      const donde = ganchos.historial ? 'del servidor (para todos)' : 'del historial de esta computadora';
+      if (!confirm(`¿Borrar la cuenta ${c.numero} ${donde}?`)) return;
+      if (ganchos.historial) await ganchos.historial.borrar(id);
+      else guardarLocal(CLAVE_HISTORIAL, lista.filter((x) => x.id !== id));
       pintarHistorial();
     }
   }
 
   function exportarRespaldo() {
-    const datos = { app: 'villalobos-gastos', version: 1, exportado: new Date().toISOString(), cuentas: historial() };
+    const datos = { app: 'villalobos-gastos', version: 1, exportado: new Date().toISOString(), cuentas: historialLocal() };
     const hoy = new Date().toISOString().slice(0, 10);
     ExcelCuenta.bajarBlob(new Blob([JSON.stringify(datos, null, 1)], { type: 'application/json' }), `Respaldo cuentas de gastos ${hoy}.json`);
   }
@@ -576,7 +621,7 @@
     const entrantes = Array.isArray(datos?.cuentas) ? datos.cuentas.filter((h) => h && h.id && h.cuenta && h.cuenta.cliente) : null;
     if (datos?.app !== 'villalobos-gastos' || !entrantes) { aviso('El archivo no es un respaldo de esta app.'); return; }
     // Se juntan con lo que ya hay; si la misma cuenta está en los dos, se queda la guardada más reciente
-    const porId = new Map(historial().map((h) => [h.id, h]));
+    const porId = new Map(historialLocal().map((h) => [h.id, h]));
     let nuevas = 0;
     for (const h of entrantes) {
       const actual = porId.get(h.id);
@@ -633,6 +678,25 @@
     const nProv = Object.keys(proveedores()).length;
     $('#info-catalogos').textContent = `${nCli} cliente(s) y ${nProv} proveedor(es) guardados.`;
   }
+
+  function reiniciarCuenta() {
+    docs.forEach((d) => d.pdf && URL.revokeObjectURL(d.pdf.url));
+    docs = [];
+    cuenta = Cuenta.cuentaVacia(formato());
+    camposAuto.clear();
+    cerrarVisor();
+    pintarTodo();
+  }
+
+  // Abre una cuenta guardada (las de versiones anteriores reciben los campos nuevos con su valor por omisión)
+  function abrirCuenta(datos) {
+    reiniciarCuenta();
+    cuenta = Object.assign(Cuenta.cuentaVacia(formato()), JSON.parse(JSON.stringify(datos)));
+    pintarTodo();
+  }
+
+  // ¿Hay algo capturado que se perdería al empezar otra cuenta?
+  const hayCaptura = () => docs.length > 0 || Boolean(String(cuenta.numero).trim()) || cuenta.gastos.length > 0;
 
   // ---------- Eventos ----------
   function engancharEventos() {
@@ -709,12 +773,8 @@
 
     $('#btn-nueva').addEventListener('click', () => {
       if (!confirm('¿Empezar una cuenta nueva? Se borran los datos capturados y los documentos cargados.')) return;
-      docs.forEach((d) => d.pdf && URL.revokeObjectURL(d.pdf.url));
-      docs = [];
-      cuenta = Cuenta.cuentaVacia(formato());
-      camposAuto.clear();
-      cerrarVisor();
-      pintarTodo();
+      reiniciarCuenta();
+      document.dispatchEvent(new CustomEvent('vg:cuenta-nueva'));
     });
 
     // Al descargar se recuerdan el cliente y el acomodo usado
@@ -750,7 +810,7 @@
     });
     $('#historial-cerrar').addEventListener('click', () => dlg.close());
     dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // clic fuera de la ventana
-    $('#historial-buscar').addEventListener('input', pintarHistorial);
+    $('#historial-buscar').addEventListener('input', () => pintarHistorial({ recargar: false }));
     $('#tabla-historial tbody').addEventListener('click', (e) => {
       const b = e.target.closest('[data-accion]');
       if (b) accionHistorial(b.closest('tr').dataset.id, b.dataset.accion).catch((err) => aviso(`No se pudo: ${err.message}`));
@@ -774,6 +834,9 @@
   pintarTodo();
   pintarInfoCatalogos();
 
-  // Para pruebas desde la consola
-  window.App = { cargarArchivos, estado: () => cuenta, documentos: () => docs };
+  // Para expedientes.js y para pruebas desde la consola
+  window.App = {
+    cargarArchivos, cargarDelExpediente, leerPedimento, reiniciarCuenta, abrirCuenta, hayCaptura, aviso,
+    ganchos, clientes, estado: () => cuenta, documentos: () => docs,
+  };
 })();

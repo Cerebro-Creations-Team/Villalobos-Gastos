@@ -142,6 +142,52 @@ input.mono { font-family: Consolas, 'SF Mono', monospace; font-size: 12px; }
 .historial .acciones { white-space: nowrap; text-align: right; }
 .historial__pie { align-items: center; margin-top: 0; }
 .historial__pie label.btn { flex-direction: row; display: inline-flex; color: var(--grafito); font-size: 13px; }
+/* ---------- Modo servidor: sesión, expedientes ---------- */
+.barra__usuario { color: var(--oro); font-size: 13px; font-weight: 600; align-self: center; padding: 0 4px; white-space: nowrap; }
+
+.pestanas { display: flex; gap: 4px; background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio); padding: 4px; }
+.pestanas button { flex: 1; border: 0; background: transparent; padding: 8px; border-radius: 4px; font-weight: 600; cursor: pointer; color: var(--muted); }
+.pestanas button[aria-selected="true"] { background: var(--verde); color: var(--blanco); }
+
+/* Con la pestaña Expedientes se oculta lo de la cuenta, y al revés */
+.col-docs.ver-exp > .drop, .col-docs.ver-exp > .nota-privacidad, .col-docs.ver-exp > .docs,
+.col-docs.ver-exp > .visor, .col-docs.ver-exp > .exp-actual { display: none !important; }
+.col-docs:not(.ver-exp) > .panel-exp { display: none !important; }
+
+.panel-exp { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; }
+.panel-exp__barra { display: flex; gap: 8px; }
+.panel-exp__barra input { flex: 1; }
+.arbol { display: flex; flex-direction: column; gap: 6px; }
+.arbol__cliente { background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio); }
+.arbol__cliente summary { padding: 8px 10px; cursor: pointer; font-size: 13px; }
+.arbol__cliente ul { list-style: none; margin: 0; padding: 0 6px 6px; }
+.arbol__ped { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.arbol__ped:hover { background: var(--marfil); }
+.arbol__ped.sel { background: #eef2ef; outline: 1px solid var(--verde); }
+
+.exp-detalle { background: var(--blanco); border: 1px solid var(--oro); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.exp-detalle__cab { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.exp-detalle h3 { margin: 6px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.exp-detalle label.btn { flex-direction: row; display: inline-flex; color: var(--grafito); align-self: flex-start; }
+.exp-arch { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.exp-arch li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--linea); }
+.exp-arch__nombre { overflow-wrap: anywhere; font-weight: 600; }
+.exp-arch__acc { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.exp-arch__acc .btn { text-decoration: none; color: var(--grafito); }
+
+.exp-actual { background: #f6eedb; border: 1px solid var(--oro); border-radius: var(--radio); padding: 8px 10px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.drop--chico { padding: 14px; }
+
+.login { border: 0; border-radius: 12px; padding: 28px; width: min(380px, calc(100% - 32px)); box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.login::backdrop { background: var(--verde); }
+.login form { display: flex; flex-direction: column; gap: 12px; text-align: center; }
+.login img { align-self: center; }
+.login h2 { margin: 0; font-family: var(--titulos); color: var(--verde); }
+.login p { margin: 0; }
+.login label { text-align: left; }
+.login__error { color: var(--error); font-size: 13px; min-height: 1em; margin: 0; }
+
 .aviso { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--verde); color: var(--blanco); padding: 10px 16px; border-radius: var(--radio); font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100% - 32px); }
 .aviso.ver { opacity: 1; transform: translateX(-50%) translateY(0); }
 

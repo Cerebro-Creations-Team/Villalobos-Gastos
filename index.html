@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20261029c">
+  <link rel="stylesheet" href="css/app.css?v=20261029e">
 </head>
 <body>
   <header class="barra">
@@ -21,6 +21,8 @@
       </div>
     </div>
     <div class="barra__acciones">
+      <span class="barra__usuario" id="usuario" hidden></span>
+      <button type="button" class="btn btn--ghost" id="btn-salir" hidden>Salir</button>
       <button type="button" class="btn btn--ghost" id="btn-historial">Cuentas anteriores</button>
       <button type="button" class="btn btn--ghost" id="btn-nueva">Nueva cuenta</button>
       <button type="button" class="btn btn--oro" id="btn-pdf">Descargar PDF</button>
@@ -31,6 +33,23 @@
   <main class="layout">
     <!-- Columna izquierda: documentos -->
     <section class="col-docs">
+      <!-- Solo con servidor: expedientes por cliente y pedimento -->
+      <div class="pestanas" id="pestanas" role="tablist" hidden>
+        <button type="button" role="tab" data-pestana="expedientes" aria-selected="true">Expedientes</button>
+        <button type="button" role="tab" data-pestana="cuenta" aria-selected="false">Cuenta de gastos</button>
+      </div>
+
+      <div class="panel-exp" id="panel-expedientes" hidden>
+        <div class="panel-exp__barra">
+          <input type="search" id="exp-buscar" placeholder="Buscar cliente, RFC, pedimento o referencia">
+          <button type="button" class="btn btn--chico btn--oro" id="btn-exp-nuevo">+ Nuevo expediente</button>
+        </div>
+        <div class="arbol" id="arbol-expedientes"></div>
+        <div class="exp-detalle" id="detalle-expediente" hidden></div>
+      </div>
+
+      <div class="exp-actual" id="expediente-actual" hidden></div>
+
       <label class="drop" id="drop">
         <input type="file" id="archivos" multiple accept=".xml,.pdf,application/pdf,text/xml,application/xml">
         <strong>Arrastra aquí los XML y PDF de la cuenta</strong>
@@ -174,17 +193,54 @@
     </div>
   </dialog>
 
+  <!-- Solo con servidor -->
+  <dialog class="login" id="login" aria-labelledby="login-titulo">
+    <form id="form-login">
+      <img src="img/logo-verde.png" alt="" width="56" height="54">
+      <h2 id="login-titulo">Comprobante de gastos</h2>
+      <p class="muted">Agencia Aduanal Villalobos</p>
+      <label>Correo<input type="email" name="correo" autocomplete="username" required></label>
+      <label>Contraseña<input type="password" name="contrasena" autocomplete="current-password" required></label>
+      <p class="login__error" id="login-error" role="alert"></p>
+      <button type="submit" class="btn btn--oro">Entrar</button>
+    </form>
+  </dialog>
+
+  <dialog class="historial" id="dlg-expediente" aria-labelledby="dlg-exp-titulo">
+    <div class="historial__barra">
+      <h2 id="dlg-exp-titulo">Nuevo expediente</h2>
+      <button type="button" class="btn-x" id="dlg-exp-cerrar" aria-label="Cerrar">×</button>
+    </div>
+    <p class="muted">Sube los PDF del pedimento (por ejemplo la carpeta «P. A91 MV CORAMEX»). Si viene el pedimento con texto, los datos se llenan solos.</p>
+    <label class="drop drop--chico" id="dlg-exp-drop">
+      <input type="file" id="dlg-exp-archivos" multiple accept=".pdf,.xml,application/pdf">
+      <strong>Elige o arrastra los archivos del expediente</strong>
+      <span id="dlg-exp-lista">Ningún archivo elegido</span>
+    </label>
+    <div class="grid g4">
+      <label>RFC del cliente<input id="dlg-exp-rfc" class="mayus" required></label>
+      <label class="span2">Cliente<input id="dlg-exp-cliente" required></label>
+      <label>Referencia<input id="dlg-exp-ref" class="mayus" placeholder="A91"></label>
+      <label>Pedimento<input id="dlg-exp-pedimento" placeholder="2043-6200091" required></label>
+    </div>
+    <p class="login__error" id="dlg-exp-error" role="alert"></p>
+    <div class="fila-botones">
+      <button type="button" class="btn btn--oro" id="dlg-exp-guardar">Crear expediente y subir archivos</button>
+    </div>
+  </dialog>
+
   <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="js/logo.js?v=20261029c"></script>
-  <script src="js/letras.js?v=20261029c"></script>
-  <script src="js/cfdi.js?v=20261029c"></script>
-  <script src="js/cuenta.js?v=20261029c"></script>
-  <script src="js/excel.js?v=20261029c"></script>
-  <script src="js/pdf-cuenta.js?v=20261029c"></script>
-  <script src="js/app.js?v=20261029c"></script>
+  <script src="js/logo.js?v=20261029e"></script>
+  <script src="js/letras.js?v=20261029e"></script>
+  <script src="js/cfdi.js?v=20261029e"></script>
+  <script src="js/cuenta.js?v=20261029e"></script>
+  <script src="js/excel.js?v=20261029e"></script>
+  <script src="js/pdf-cuenta.js?v=20261029e"></script>
+  <script src="js/app.js?v=20261029e"></script>
+  <script src="js/expedientes.js?v=20261029e"></script>
 </body>
 </html>
